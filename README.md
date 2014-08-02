@@ -7,7 +7,7 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 
 ### Features
 
-* Most common part of RFC 6455 are supported: single fragment text/binary messages, message length up to 8 bytes, unmasked messages from server, and connection close with status (if any). 
+* Most common parts of RFC 6455 are supported: single fragment text/binary messages, message length up to 8 bytes, unmasked messages from server, and connection close with status (if any). 
 * Thread pool
 * Platform independent
 * WebSocket Secure support
