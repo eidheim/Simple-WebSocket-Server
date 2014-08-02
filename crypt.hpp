@@ -34,7 +34,7 @@ namespace SimpleWeb {
                 BIO_write(b64, ascii.data(), ascii.length());
                 BIO_flush(b64);
 
-                //To not keep &base64[0] through BIO_free_all(b64)
+                //To keep &base64[0] through BIO_free_all(b64)
                 bptr->length=0;
                 bptr->max=0;
                 bptr->data=nullptr;
