@@ -12,7 +12,7 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 * Platform independent
 * WebSocket Secure support
 * Simple way to add WebSocket endpoints using regex for path, and anonymous functions
-* C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypt.hpp and crypt.cpp)
+* C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypto.hpp and crypto.cpp)
 
 ###Usage
 
