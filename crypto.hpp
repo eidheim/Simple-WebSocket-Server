@@ -1,10 +1,10 @@
-#ifndef CRYPT_HPP
-#define	CRYPT_HPP
+#ifndef CRYPTO_HPP
+#define	CRYPTO_HPP
 
 #include <string>
 
 namespace SimpleWeb {
-    namespace Crypt {
+    namespace Crypto {
         namespace Base64 {
             std::string encode(const std::string&);
             std::string decode(const std::string&);
@@ -19,5 +19,5 @@ namespace SimpleWeb {
         std::string SHA512(const std::string&);
     }
 }
-#endif	/* CRYPT_HPP */
+#endif	/* CRYPTO_HPP */
 

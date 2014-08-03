@@ -1,4 +1,4 @@
-#include "crypt.hpp"
+#include "crypto.hpp"
 
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
@@ -9,7 +9,7 @@
 #include <string>
 #include <cmath>
 
-std::string SimpleWeb::Crypt::Base64::encode(const std::string& ascii) {            
+std::string SimpleWeb::Crypto::Base64::encode(const std::string& ascii) {            
     BIO *bio, *b64;
     BUF_MEM *bptr;
 
@@ -39,7 +39,7 @@ std::string SimpleWeb::Crypt::Base64::encode(const std::string& ascii) {
     return base64;
 };
 
-std::string SimpleWeb::Crypt::Base64::decode(const std::string& base64) {
+std::string SimpleWeb::Crypto::Base64::decode(const std::string& base64) {
     std::string ascii;
     //Resize resulting ascii-string, however, the size is a up to two bytes too large.
     ascii.resize((6*base64.length())/8);
@@ -58,7 +58,7 @@ std::string SimpleWeb::Crypt::Base64::decode(const std::string& base64) {
     return ascii;
 }; 
 
-std::string SimpleWeb::Crypt::MD5(const std::string& text) {
+std::string SimpleWeb::Crypto::MD5(const std::string& text) {
     std::string encoded;
     encoded.resize(128/8);
 
@@ -69,7 +69,7 @@ std::string SimpleWeb::Crypt::MD5(const std::string& text) {
     return encoded;
 }
 
-std::string SimpleWeb::Crypt::SHA1(const std::string& text) {
+std::string SimpleWeb::Crypto::SHA1(const std::string& text) {
     std::string encoded;
     encoded.resize(160/8);
 
@@ -80,7 +80,7 @@ std::string SimpleWeb::Crypt::SHA1(const std::string& text) {
     return encoded;
 }
 
-std::string SimpleWeb::Crypt::SHA256(const std::string& text) {
+std::string SimpleWeb::Crypto::SHA256(const std::string& text) {
     std::string encoded;
     encoded.resize(256/8);
 
@@ -91,7 +91,7 @@ std::string SimpleWeb::Crypt::SHA256(const std::string& text) {
     return encoded;
 }
 
-std::string SimpleWeb::Crypt::SHA512(const std::string& text) {
+std::string SimpleWeb::Crypto::SHA512(const std::string& text) {
     std::string encoded;
     encoded.resize(512/8);
 
