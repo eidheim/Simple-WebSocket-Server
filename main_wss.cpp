@@ -13,9 +13,9 @@ int main() {
     //    var wss=new WebSocket("wss://localhost:8080/echo");
     //    wss.onmessage=function(evt){console.log(evt.data);};
     //    wss.send("test");
-    auto& callbacks_echo=server.endpoint["^/echo/?$"];
+    auto& echo=server.endpoint["^/echo/?$"];
     
-    callbacks_echo.onmessage=[&server](Connection& connection) {
+    echo.onmessage=[&server](Connection& connection) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
         *connection.message >> message_stream.rdbuf();
@@ -37,17 +37,17 @@ int main() {
         });
     };
     
-    callbacks_echo.onopen=[&server](Connection& connection) {
+    echo.onopen=[&server](Connection& connection) {
         cout << "Opened connection to " << (size_t)connection.id << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
-    callbacks_echo.onclose=[](Connection& connection, int status) {
+    echo.onclose=[](Connection& connection, int status) {
         cout << "Closed connection to " << (size_t)connection.id << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    callbacks_echo.onerror=[](Connection& connection, const boost::system::error_code& ec) {
+    echo.onerror=[](Connection& connection, const boost::system::error_code& ec) {
         cout << "Error in connection " << (size_t)connection.id << ". ";
         cout << "Error: " << ec << ", error message: " << ec.message() << endl;
     };
@@ -59,8 +59,8 @@ int main() {
     //    var wss=new WebSocket("wss://localhost:8080/echo_all");
     //    wss.onmessage=function(evt){console.log(evt.data);};
     //    wss.send("test");
-    auto& callbacks_echo_all=server.endpoint["^/echo_all/?$"];
-    callbacks_echo_all.onmessage=[&server](Connection& connection) {
+    auto& echo_all=server.endpoint["^/echo_all/?$"];
+    echo_all.onmessage=[&server](Connection& connection) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
         *connection.message >> message_stream.rdbuf();
