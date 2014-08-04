@@ -1,6 +1,8 @@
 #ifndef SERVER_HTTP_HPP
 #define	SERVER_HTTP_HPP
 
+#include "crypto.hpp"
+
 #include <boost/asio.hpp>
 
 #include <regex>
@@ -10,8 +12,6 @@
 #include <unordered_set>
 
 #include <iostream>
-
-#include "crypto.hpp"
 
 namespace SimpleWeb {
     struct Connection {
@@ -183,12 +183,12 @@ namespace SimpleWeb {
             if(connection->header.count("Sec-WebSocket-Key")==0)
                 return 0;
             
-            auto sha1=Crypto::SHA1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
+            auto sha1=Crypto<std::string>::SHA1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
 
             handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
             handshake << "Upgrade: websocket\r\n";
             handshake << "Connection: Upgrade\r\n";
-            handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
+            handshake << "Sec-WebSocket-Accept: " << Crypto<std::string>::Base64::encode(sha1) << "\r\n";
             handshake << "\r\n";
             
             return 1;

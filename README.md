@@ -12,7 +12,7 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 * Platform independent
 * WebSocket Secure support
 * Simple way to add WebSocket endpoints using regex for path, and anonymous functions
-* C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypto.hpp and crypto.cpp)
+* C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypto.hpp)
 
 ###Usage
 
@@ -30,13 +30,13 @@ Compile with a C++11 compiler supporting regex (for instance g++ 4.9):
 
 #### WS
 
-g++ -O3 -std=c++11 -lboost_system -lcrypto crypto.cpp main_ws.cpp -o ws_server
+g++ -O3 -std=c++11 -lboost_system -lcrypto main_ws.cpp -o ws_server
 
 Then to run the server: ./ws_server
 
 #### WSS
 
-g++ -O3 -std=c++11 -lboost_system -lssl -lcrypto crypto.cpp main_wss.cpp -o wss_server
+g++ -O3 -std=c++11 -lboost_system -lssl -lcrypto main_wss.cpp -o wss_server
 
 Before running the server, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
