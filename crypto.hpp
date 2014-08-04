@@ -4,15 +4,14 @@
 #include <string>
 #include <cmath>
 
-//Moving these to a seperate namespace for minimal global namespace cluttering does not work using clang++
+//Moving these to a seperate namespace for minimal global namespace cluttering does not work with clang++
 #include <openssl/evp.h>
 #include <openssl/buffer.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 
 namespace SimpleWeb {
-    //types must support size(), resize() and operator[]
-    //type_return must support constructor()
+    //type must support size(), resize() and operator[]
     template<class type>
     class Crypto {
     public:
