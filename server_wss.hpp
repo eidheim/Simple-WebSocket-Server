@@ -11,7 +11,7 @@ namespace SimpleWeb {
     class Server<WSS> : public SocketServerBase<WSS> {
     public:
         Server(unsigned short port, size_t num_threads, const std::string& cert_file, const std::string& private_key_file) : 
-        SocketServerBase<WSS>::SocketServerBase(port, num_threads), context(boost::asio::ssl::context::sslv23) {
+                SocketServerBase<WSS>::SocketServerBase(port, num_threads), context(boost::asio::ssl::context::sslv23) {
             context.use_certificate_chain_file(cert_file);
             context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
         }
@@ -29,7 +29,8 @@ namespace SimpleWeb {
                 accept();
 
                 if(!ec) {
-                    (*socket).async_handshake(boost::asio::ssl::stream_base::server, [this, socket](const boost::system::error_code& ec) {
+                    (*socket).async_handshake(boost::asio::ssl::stream_base::server, 
+                            [this, socket](const boost::system::error_code& ec) {
                         if(!ec) {
                             process_request_and_start_connection(socket);
                         }

@@ -26,7 +26,7 @@ int main() {
         response_stream << response;
         
         //server.send is an asynchronous function
-        server.send(connection.id, response_stream, [](const boost::system::error_code& ec){
+        server.send(connection, response_stream, [](const boost::system::error_code& ec){
             if(!ec)
                 cout << "Message sent successfully" << endl;
             else {
@@ -67,12 +67,12 @@ int main() {
         
         string response=message_stream.str()+" from "+to_string((size_t)connection.id);
         
-        for(auto connection_id: server.get_connection_ids()) {
+        for(auto connection_pointer: server.get_connection_pointers()) {
             stringstream response_stream;
             response_stream << response;
             
             //server.send is an asynchronous function
-            server.send(connection_id, response_stream);
+            server.send(*connection_pointer, response_stream);
         }
     };
     
