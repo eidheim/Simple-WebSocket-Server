@@ -15,12 +15,13 @@ int main() {
     //    wss.send("test");
     auto& echo=server.endpoint["^/echo/?$"];
     
-    echo.onmessage=[&server](Connection& connection) {
+    //C++14, lambda parameters declared with auto
+    echo.onmessage=[&server](auto connection) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
-        *connection.message >> message_stream.rdbuf();
+        *connection->message >> message_stream.rdbuf();
         
-        string response=message_stream.str()+" from "+to_string((size_t)connection.id);
+        string response=message_stream.str()+" from socket "+to_string((size_t)&connection->socket);
         
         stringstream response_stream;
         response_stream << response;
@@ -37,18 +38,18 @@ int main() {
         });
     };
     
-    echo.onopen=[&server](Connection& connection) {
-        cout << "Opened connection to " << (size_t)connection.id << endl;
+    echo.onopen=[&server](auto connection) {
+        cout << "Opened connection to socket " << (size_t)&connection->socket << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
-    echo.onclose=[](Connection& connection, int status) {
-        cout << "Closed connection to " << (size_t)connection.id << " with status code " << status << endl;
+    echo.onclose=[](auto connection, int status) {
+        cout << "Closed connection to socket " << (size_t)&connection->socket << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    echo.onerror=[](Connection& connection, const boost::system::error_code& ec) {
-        cout << "Error in connection " << (size_t)connection.id << ". ";
+    echo.onerror=[](auto connection, const boost::system::error_code& ec) {
+        cout << "Error in connection to socket " << (size_t)&connection->socket << ". ";
         cout << "Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
@@ -60,19 +61,19 @@ int main() {
     //    wss.onmessage=function(evt){console.log(evt.data);};
     //    wss.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](Connection& connection) {
+    echo_all.onmessage=[&server](auto connection) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
-        *connection.message >> message_stream.rdbuf();
+        *connection->message >> message_stream.rdbuf();
         
-        string response=message_stream.str()+" from "+to_string((size_t)connection.id);
+        string response=message_stream.str()+" from socket "+to_string((size_t)&connection->socket);
         
-        for(auto connection_pointer: server.get_connection_pointers()) {
+        for(auto connection: server.get_connections()) {
             stringstream response_stream;
             response_stream << response;
             
             //server.send is an asynchronous function
-            server.send(*connection_pointer, response_stream);
+            server.send(connection, response_stream);
         }
     };
     

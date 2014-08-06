@@ -1,7 +1,7 @@
 Simple-WebSocket-Server
 =================
 
-A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebSocket Secure (WSS) server implemented using C++11, Boost.Asio and OpenSSL. Created to be an easy way to make WebSocket endpoints in C++.
+A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebSocket Secure (WSS) server implemented using C++14, Boost.Asio and OpenSSL. Created to be an easy way to make WebSocket endpoints in C++.
 
 See also https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. 
 
@@ -26,17 +26,17 @@ OpenSSL libraries from https://www.openssl.org are required.
 
 ### Compile and run
 
-Compile with a C++11 compiler supporting regex (for instance g++ 4.9):
+Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
 #### WS
 
-g++ -O3 -std=c++11 -lboost_system -lcrypto main_ws.cpp -o ws_server
+g++ -O3 -std=c++1y -lboost_system -lcrypto main_ws.cpp -o ws_server
 
 Then to run the server: ./ws_server
 
 #### WSS
 
-g++ -O3 -std=c++11 -lboost_system -lssl -lcrypto main_wss.cpp -o wss_server
+g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto main_wss.cpp -o wss_server
 
 Before running the server, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
