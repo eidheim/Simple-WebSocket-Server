@@ -68,12 +68,12 @@ int main() {
         
         string response=message_stream.str()+" from socket "+to_string((size_t)&connection->socket);
         
-        for(auto connection: server.get_connections()) {
+        for(auto a_connection: server.get_connections()) {
             stringstream response_stream;
             response_stream << response;
             
             //server.send is an asynchronous function
-            server.send(connection, response_stream);
+            server.send(a_connection, response_stream);
         }
     };
     
