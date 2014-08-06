@@ -35,6 +35,7 @@ namespace SimpleWeb {
 
         private:
             bool closed;
+            std::mutex closed_mutex;
 
             std::shared_ptr<boost::asio::deadline_timer> timer_idle;
 
@@ -117,9 +118,13 @@ namespace SimpleWeb {
         
         void send_close(std::shared_ptr<Connection> connection, int status, const std::string& reason="") {
             //Send close only once (in case close is initiated by server)
-            if(connection->closed)
+            connection->closed_mutex.lock();
+            if(connection->closed) {
+                connection->closed_mutex.unlock();
                 return;
+            }
             connection->closed=true;
+            connection->closed_mutex.unlock();
             
             std::stringstream response;
             
