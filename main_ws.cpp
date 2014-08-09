@@ -1,4 +1,4 @@
-/*#include "server_ws.hpp"
+#include "server_ws.hpp"
 #include "client_ws.hpp"
 
 using namespace std;
@@ -124,4 +124,4 @@ int main() {
     server_thread.join();
     
     return 0;
-}*/
+}
