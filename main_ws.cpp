@@ -1,4 +1,5 @@
 #include "server_ws.hpp"
+#include "client_ws.hpp"
 
 using namespace std;
 using namespace SimpleWeb;
@@ -16,41 +17,46 @@ int main() {
     auto& echo=server.endpoint["^/echo/?$"];
     
     //C++14, lambda parameters declared with auto
-    echo.onmessage=[&server](auto connection) {
+    //For C++11 use: (shared_ptr<Server<WS>::Connection> connection, std::shared_ptr<std::istream> message, size_t message_length)
+    echo.onmessage=[&server](auto connection, auto message, size_t message_length) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
-        *connection->message >> message_stream.rdbuf();
+        *message >> message_stream.rdbuf();
         
-        string response=message_stream.str()+" from socket "+to_string((size_t)&connection->socket);
+        cout << "Server: Message received: \"" << message_stream.str() << "\"" << endl;;
+        
+        string response="'"+message_stream.str()+"' to connection "+to_string((size_t)connection.get());
         
         stringstream response_stream;
         response_stream << response;
         
+        cout << "Server: Sending message \"" << response <<  "\"" << endl;
+        
         //server.send is an asynchronous function
-        server.send(connection, response_stream, [](const boost::system::error_code& ec){
+        server.send(connection, response_stream, [response](const boost::system::error_code& ec){
             if(!ec)
-                cout << "Message sent successfully" << endl;
+                cout << "Server: Message \"" << response <<  "\" sent successfully" << endl;
             else {
-                cout << "Error sending message. ";
+                cout << "Server: Error sending message. " <<
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-                cout << "Error: " << ec << ", error message: " << ec.message() << endl;
+                        "Error: " << ec << ", error message: " << ec.message() << endl;
            }
         });
     };
     
     echo.onopen=[&server](auto connection) {
-        cout << "Opened connection to socket " << (size_t)&connection->socket << endl;
+        cout << "Server: Opened connection " << (size_t)connection.get() << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
     echo.onclose=[](auto connection, int status) {
-        cout << "Closed connection to socket " << (size_t)&connection->socket << " with status code " << status << endl;
+        cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
     echo.onerror=[](auto connection, const boost::system::error_code& ec) {
-        cout << "Error in connection to socket " << (size_t)&connection->socket << ". ";
-        cout << "Error: " << ec << ", error message: " << ec.message() << endl;
+        cout << "Server: Error in connection " << (size_t)connection.get() << ". " << 
+                "Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
 
@@ -61,14 +67,13 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](auto connection) {
+    echo_all.onmessage=[&server](auto connection, auto message, size_t message_length) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
-        *connection->message >> message_stream.rdbuf();
-        
-        string response=message_stream.str()+" from socket "+to_string((size_t)&connection->socket);
+        *message >> message_stream.rdbuf();
         
         for(auto a_connection: server.get_connections()) {
+            string response="'"+message_stream.str()+"' to connection "+to_string((size_t)a_connection.get());
             stringstream response_stream;
             response_stream << response;
             
@@ -77,8 +82,55 @@ int main() {
         }
     };
     
-    //Start WS-server
-    server.start();
+    thread server_thread([&server](){
+        //Start WS-server
+        server.start();
+    });
+    
+    //Wait for server to start
+    this_thread::sleep_for(chrono::seconds(1));
+    
+    //Example 3: Client communication with server
+    //Possible output:
+    //Server: Opened connection 140300362205136
+    //Client: Opened connection
+    //Client: Sending message: "Hello"
+    //Server: Message received: "Hello"
+    //Server: Sending message "'Hello' to connection 140300362205136"
+    //Server: Message "'Hello' to connection 140300362205136" sent successfully
+    //Client: Message received: "'Hello' to connection 140300362205136"
+    //Client: Sending close connection
+    //Server: Closed connection 140300362205136 with status code 1000
+    //Client: Closed connection with status code 1000
+    Client<WS> client("localhost:8080/echo");
+    client.onmessage=[&client](auto message, size_t message_length) {
+        cout << "Client: Message received: \"" << message->rdbuf() << "\"" << endl;
+        
+        cout << "Client: Sending close connection" << endl;
+        client.send_close(1000);
+    };
+    
+    client.onopen=[&client]() {
+        cout << "Client: Opened connection" << endl;
+        
+        stringstream ss;
+        ss << "Hello";
+        cout << "Client: Sending message: \"" << ss.str() << "\"" << endl;
+        client.send(ss);
+    };
+    
+    client.onclose=[&client](int status) {
+        cout << "Client: Closed connection with status code " << status << endl;
+    };
+    
+    //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
+    client.onerror=[](const boost::system::error_code& ec) {
+        cout << "Client: Error: " << ec << ", error message: " << ec.message() << endl;
+    };
+    
+    client.start();
+    
+    server_thread.join();
     
     return 0;
 }

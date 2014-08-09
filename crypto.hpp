@@ -12,12 +12,10 @@
 
 namespace SimpleWeb {
     //type must support size(), resize() and operator[]
-    template<class type>
-    class Crypto {
-    public:
-        class Base64 {
-        public:
-            static type encode(const type& ascii) {
+    namespace Crypto {
+        namespace Base64 {
+            template<class type>
+            type encode(const type& ascii) {
                 BIO *bio, *b64;
                 BUF_MEM *bptr;
 
@@ -47,7 +45,8 @@ namespace SimpleWeb {
                 return base64;
             }
             
-            static type decode(const type& base64) {
+            template<class type>
+            type decode(const type& base64) {
                 type ascii;
                 //Resize resulting ascii-string, however, the size is a up to two bytes too large.
                 ascii.resize((6*base64.size())/8);
@@ -65,9 +64,10 @@ namespace SimpleWeb {
 
                 return ascii;
             }
-        };
+        }
         
-        static type MD5(const type& text) {
+        template<class type>
+        type MD5(const type& text) {
             type encoded;
             encoded.resize(128/8);
 
@@ -78,7 +78,8 @@ namespace SimpleWeb {
             return encoded;
         }
 
-        static type SHA1(const type& text) {
+        template<class type>
+        type SHA1(const type& text) {
             type encoded;
             encoded.resize(160/8);
 
@@ -89,7 +90,8 @@ namespace SimpleWeb {
             return encoded;
         }
 
-        static type SHA256(const type& text) {
+        template<class type>
+        type SHA256(const type& text) {
             type encoded;
             encoded.resize(256/8);
 
@@ -100,7 +102,8 @@ namespace SimpleWeb {
             return encoded;
         }
 
-        static type SHA512(const type& text) {
+        template<class type>
+        type SHA512(const type& text) {
             type encoded;
             encoded.resize(512/8);
 
@@ -110,7 +113,7 @@ namespace SimpleWeb {
             SHA512_Final((unsigned char*)&encoded[0], &context);
             return encoded;
         }
-    };
+    }
 }
 #endif	/* CRYPTO_HPP */
 

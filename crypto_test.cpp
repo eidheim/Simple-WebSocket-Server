@@ -52,12 +52,12 @@ string to_hex_string(type chars) {
 int main(int argc, char** argv) {
     //Testing SimpleWeb::Crypt::Base64
     for(auto& string_test: Base64_string_tests) {
-        if(Crypto<string>::Base64::encode(string_test.first)!=string_test.second) {
-            cerr << "FAIL Crypto<string>::Base64::encode: " << string_test.first << "!=" << string_test.second << endl;
+        if(Crypto::Base64::encode(string_test.first)!=string_test.second) {
+            cerr << "FAIL Crypto::Base64::encode: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
-        if(Crypto<string>::Base64::decode(string_test.second)!=string_test.first) {
-            cerr << "FAIL Crypto<string>::Base64::decode: " << string_test.second << "!=" << string_test.first << endl;
+        if(Crypto::Base64::decode(string_test.second)!=string_test.first) {
+            cerr << "FAIL Crypto::Base64::decode: " << string_test.second << "!=" << string_test.first << endl;
             return 1;
         }
         
@@ -65,68 +65,68 @@ int main(int argc, char** argv) {
             {string_test.first.begin(), string_test.first.end()},
             {string_test.second.begin(), string_test.second.end()}
         };
-        if(Crypto<vector<unsigned char> >::Base64::encode(vector_test.first)!=vector_test.second) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::Base64::encode: " << string_test.first << "!=" << string_test.second << endl;
+        if(Crypto::Base64::encode(vector_test.first)!=vector_test.second) {
+            cerr << "FAIL Crypto::Base64::encode: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
-        if(Crypto<vector<unsigned char> >::Base64::decode(vector_test.second)!=vector_test.first) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::Base64::decode: " << string_test.second << "!=" << string_test.first << endl;
+        if(Crypto::Base64::decode(vector_test.second)!=vector_test.first) {
+            cerr << "FAIL Crypto::Base64::decode: " << string_test.second << "!=" << string_test.first << endl;
             return 1;
         }
     }
     
     //Testing SimpleWeb::Crypt::MD5
     for(auto& string_test: MD5_string_tests) {
-        if(to_hex_string(Crypto<string>::MD5(string_test.first)) != string_test.second) {
-            cerr << "FAIL Crypto<string>::MD5: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::MD5(string_test.first)) != string_test.second) {
+            cerr << "FAIL Crypto::MD5: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
         
         vector<unsigned char> vector_test_first(string_test.first.begin(), string_test.first.end());
-        if(to_hex_string(Crypto<vector<unsigned char> >::MD5(vector_test_first)) != string_test.second) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::MD5: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::MD5(vector_test_first)) != string_test.second) {
+            cerr << "FAIL Crypto::MD5: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
     }
     
     //Testing SimpleWeb::Crypt::SHA1
     for(auto& string_test: SHA1_string_tests) {
-        if(to_hex_string(Crypto<string>::SHA1(string_test.first)) != string_test.second) {
-            cerr << "FAIL Crypto<string>::SHA1: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA1(string_test.first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA1: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
         
         vector<unsigned char> vector_test_first(string_test.first.begin(), string_test.first.end());
-        if(to_hex_string(Crypto<vector<unsigned char> >::SHA1(vector_test_first)) != string_test.second) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::SHA1: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA1(vector_test_first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA1: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
     }
     
     //Testing SimpleWeb::Crypt::SHA256
     for(auto& string_test: SHA256_string_tests) {
-        if(to_hex_string(Crypto<string>::SHA256(string_test.first)) != string_test.second) {
-            cerr << "FAIL Crypto<string>::SHA256: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA256(string_test.first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA256: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
         
         vector<unsigned char> vector_test_first(string_test.first.begin(), string_test.first.end());
-        if(to_hex_string(Crypto<vector<unsigned char> >::SHA256(vector_test_first)) != string_test.second) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::SHA256: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA256(vector_test_first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA256: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
     }
     
     //Testing SimpleWeb::Crypt::SHA512
     for(auto& string_test: SHA512_string_tests) {
-        if(to_hex_string(Crypto<string>::SHA512(string_test.first)) != string_test.second) {
-            cerr << "FAIL Crypto<string>::SHA512: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA512(string_test.first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA512: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
         
         vector<unsigned char> vector_test_first(string_test.first.begin(), string_test.first.end());
-        if(to_hex_string(Crypto<vector<unsigned char> >::SHA512(vector_test_first)) != string_test.second) {
-            cerr << "FAIL Crypto<vector<unsigned char> >::SHA512: " << string_test.first << "!=" << string_test.second << endl;
+        if(to_hex_string(Crypto::SHA512(vector_test_first)) != string_test.second) {
+            cerr << "FAIL Crypto::SHA512: " << string_test.first << "!=" << string_test.second << endl;
             return 1;
         }
     }
