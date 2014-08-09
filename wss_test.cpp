@@ -83,6 +83,7 @@ int main() {
     this_thread::sleep_for(chrono::seconds(1));
     
     //Example 3: Client communication with server
+    //Second Client() parameter set to false: no certificate verification
     //Possible output:
     //Server: Opened connection 140243756912112
     //Client: Opened connection
@@ -93,7 +94,7 @@ int main() {
     //Client: Sending close connection
     //Server: Closed connection 140243756912112 with status code 1000
     //Client: Closed connection with status code 1000
-    Client<WSS> client("localhost:8080/echo");
+    Client<WSS> client("localhost:8080/echo", false);
     client.onmessage=[&client](auto message, size_t message_length) {
         cout << "Client: Message received: \"" << message->rdbuf() << "\"" << endl;
         
