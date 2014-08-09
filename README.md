@@ -34,14 +34,14 @@ Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
 #### WS
 
-g++ -O3 -std=c++1y -lboost_system -lcrypto main_ws.cpp -o ws
+g++ -O3 -std=c++1y -lboost_system -lcrypto main_ws.cpp -o ws_test
 
-Then to run the server: ./ws
+Then to run the server: ./ws_test
 
 #### WSS
 
-g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto main_wss.cpp -o wss
+g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto main_wss.cpp -o wss_test
 
 Before running the test, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
-Then to run the server: ./wss
+Then to run the server: ./wss_test
