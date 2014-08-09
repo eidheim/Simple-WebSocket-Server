@@ -18,7 +18,7 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 
 ###Usage
 
-See ws_test.cpp or wss_test.cpp for example usage. 
+See ws_examples.cpp or wss_examples.cpp for example usage. 
 
 ### Dependencies
 
@@ -28,20 +28,20 @@ OpenSSL libraries from https://www.openssl.org are required.
 
 ### Compile and run
 
-ws_test.cpp and wss_test.cpp use C++14 features.
+ws_examples.cpp and wss_examples.cpp use C++14 features.
 
 Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
 #### WS
 
-g++ -O3 -std=c++1y -lboost_system -lcrypto ws_test.cpp -o ws_test
+g++ -O3 -std=c++1y -lboost_system -lcrypto ws_examples.cpp -o ws_examples
 
-Then to run the server: ./ws_test
+Then to run the server: ./ws_examples
 
 #### WSS
 
-g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto wss_test.cpp -o wss_test
+g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto wss_examples.cpp -o wss_examples
 
-Before running the test, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
+Before running, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
-Then to run the server: ./wss_test
+Then to run the server: ./wss_examples
