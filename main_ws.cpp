@@ -1,4 +1,4 @@
-#include "server_ws.hpp"
+/*#include "server_ws.hpp"
 #include "client_ws.hpp"
 
 using namespace std;
@@ -24,19 +24,12 @@ int main() {
         *message >> message_stream.rdbuf();
         
         cout << "Server: Message received: \"" << message_stream.str() << "\"" << endl;;
-        
-        string response="'"+message_stream.str()+"' to connection "+to_string((size_t)connection.get());
-        
-        stringstream response_stream;
-        response_stream << response;
-        
-        cout << "Server: Sending message \"" << response <<  "\"" << endl;
+                
+        cout << "Server: Sending message \"" << message_stream.str() <<  "\" to " << (size_t)connection.get() << endl;
         
         //server.send is an asynchronous function
-        server.send(connection, response_stream, [response](const boost::system::error_code& ec){
-            if(!ec)
-                cout << "Server: Message \"" << response <<  "\" sent successfully" << endl;
-            else {
+        server.send(connection, message_stream, [](const boost::system::error_code& ec){
+            if(ec) {
                 cout << "Server: Error sending message. " <<
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
                         "Error: " << ec << ", error message: " << ec.message() << endl;
@@ -44,7 +37,7 @@ int main() {
         });
     };
     
-    echo.onopen=[&server](auto connection) {
+    echo.onopen=[](auto connection) {
         cout << "Server: Opened connection " << (size_t)connection.get() << endl;
     };
     
@@ -73,9 +66,8 @@ int main() {
         *message >> message_stream.rdbuf();
         
         for(auto a_connection: server.get_connections()) {
-            string response="'"+message_stream.str()+"' to connection "+to_string((size_t)a_connection.get());
             stringstream response_stream;
-            response_stream << response;
+            response_stream << message_stream.str();
             
             //server.send is an asynchronous function
             server.send(a_connection, response_stream);
@@ -87,20 +79,19 @@ int main() {
         server.start();
     });
     
-    //Wait for server to start
+    //Wait for server to start so that the client can connect
     this_thread::sleep_for(chrono::seconds(1));
     
     //Example 3: Client communication with server
     //Possible output:
-    //Server: Opened connection 140300362205136
+    //Server: Opened connection 140243756912112
     //Client: Opened connection
     //Client: Sending message: "Hello"
     //Server: Message received: "Hello"
-    //Server: Sending message "'Hello' to connection 140300362205136"
-    //Server: Message "'Hello' to connection 140300362205136" sent successfully
-    //Client: Message received: "'Hello' to connection 140300362205136"
+    //Server: Sending message "Hello" to 140243756912112
+    //Client: Message received: "Hello"
     //Client: Sending close connection
-    //Server: Closed connection 140300362205136 with status code 1000
+    //Server: Closed connection 140243756912112 with status code 1000
     //Client: Closed connection with status code 1000
     Client<WS> client("localhost:8080/echo");
     client.onmessage=[&client](auto message, size_t message_length) {
@@ -119,7 +110,7 @@ int main() {
         client.send(ss);
     };
     
-    client.onclose=[&client](int status) {
+    client.onclose=[](int status) {
         cout << "Client: Closed connection with status code " << status << endl;
     };
     
@@ -133,4 +124,4 @@ int main() {
     server_thread.join();
     
     return 0;
-}
+}*/
