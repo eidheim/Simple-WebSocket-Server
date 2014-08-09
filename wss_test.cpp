@@ -1,23 +1,23 @@
-#include "server_ws.hpp"
-#include "client_ws.hpp"
+#include "server_wss.hpp"
+#include "client_wss.hpp"
 
 using namespace std;
 using namespace SimpleWeb;
 
 int main() {
-    //WebSocket (WS)-server at port 8080 using 4 threads
-    Server<WS> server(8080, 4);
+    //WebSocket Secure (WSS)-server at port 8080 using 4 threads
+    Server<WSS> server(8080, 4, "server.crt", "server.key");
     
-    //Example 1: echo WebSocket endpoint
+    //Example 1: echo WebSocket Secure endpoint
     //  Added debug messages for example use of the callbacks
     //  Test with the following JavaScript:
-    //    var ws=new WebSocket("ws://localhost:8080/echo");
-    //    ws.onmessage=function(evt){console.log(evt.data);};
-    //    ws.send("test");
+    //    var wss=new WebSocket("wss://localhost:8080/echo");
+    //    wss.onmessage=function(evt){console.log(evt.data);};
+    //    wss.send("test");
     auto& echo=server.endpoint["^/echo/?$"];
     
     //C++14, lambda parameters declared with auto
-    //For C++11 use: (shared_ptr<Server<WS>::Connection> connection, std::shared_ptr<std::istream> message, size_t message_length)
+    //For C++11 use: (shared_ptr<Server<WSS>::Connection> connection, std::shared_ptr<std::istream> message, size_t message_length)
     echo.onmessage=[&server](auto connection, auto message, size_t message_length) {
         //To receive message from client as string (message_stream.str())
         stringstream message_stream;
@@ -53,12 +53,12 @@ int main() {
     };
     
 
-    //Example 2: Echo to all WebSocket endpoints
+    //Example 2: Echo to all WebSocket Secure endpoints
     //  Sending received messages to all connected clients
     //  Test with the following JavaScript on more than one browser windows:
-    //    var ws=new WebSocket("ws://localhost:8080/echo_all");
-    //    ws.onmessage=function(evt){console.log(evt.data);};
-    //    ws.send("test");
+    //    var wss=new WebSocket("wss://localhost:8080/echo_all");
+    //    wss.onmessage=function(evt){console.log(evt.data);};
+    //    wss.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
     echo_all.onmessage=[&server](auto connection, auto message, size_t message_length) {
         //To receive message from client as string (message_stream.str())
@@ -75,7 +75,7 @@ int main() {
     };
     
     thread server_thread([&server](){
-        //Start WS-server
+        //Start WSS-server
         server.start();
     });
     
@@ -93,7 +93,7 @@ int main() {
     //Client: Sending close connection
     //Server: Closed connection 140243756912112 with status code 1000
     //Client: Closed connection with status code 1000
-    Client<WS> client("localhost:8080/echo");
+    Client<WSS> client("localhost:8080/echo");
     client.onmessage=[&client](auto message, size_t message_length) {
         cout << "Client: Message received: \"" << message->rdbuf() << "\"" << endl;
         
