@@ -241,6 +241,14 @@ namespace SimpleWeb {
                     
                     unsigned char fin_rsv_opcode=num_bytes[0];
                     
+                    //Close connection if masked message from server (protocol error)
+                    if(num_bytes[1]>=128) {
+                        send_close(1002, "message from server masked");
+                        if(onclose)
+                            onclose(1002);
+                        return;
+                    }
+                    
                     size_t length=(num_bytes[1]&127);
 
                     if(length==126) {
