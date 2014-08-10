@@ -4,9 +4,6 @@
 using namespace std;
 using namespace SimpleWeb;
 
-//TODO store Message::data's boost::asio::streambuf as shared_ptr in Message
-//TODO or as simply boost::asio::streambuf toghether with Message:data as istream
-
 int main() {
     //WebSocket (WS)-server at port 8080 using 4 threads
     Server<WS> server(8080, 4);
