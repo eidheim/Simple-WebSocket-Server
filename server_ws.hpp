@@ -38,10 +38,17 @@ namespace SimpleWeb {
             Connection(std::shared_ptr<socket_type> socket): socket(socket), closed(false) {}
         };
 
-        struct Message {
-            std::shared_ptr<std::istream> data;
+        class Message {
+            friend class SocketServerBase<socket_type>;
+            
+        public:
+            std::istream data;
             size_t length;
             unsigned char fin_rsv_opcode;
+            
+        private:
+            Message(): data(&streambuf) {}
+            boost::asio::streambuf streambuf;
         };
         
         struct Callbacks {
@@ -273,21 +280,21 @@ namespace SimpleWeb {
                 if(!ec) {
                     std::istream stream(read_buffer.get());
 
-                    std::vector<unsigned char> num_bytes;
-                    num_bytes.resize(2);
-                    stream.read((char*)&num_bytes[0], 2);
+                    std::vector<unsigned char> first_bytes;
+                    first_bytes.resize(2);
+                    stream.read((char*)&first_bytes[0], 2);
                     
-                    unsigned char fin_rsv_opcode=num_bytes[0];
+                    unsigned char fin_rsv_opcode=first_bytes[0];
                     
                     //Close connection if unmasked message from client (protocol error)
-                    if(num_bytes[1]<128) {
+                    if(first_bytes[1]<128) {
                         const std::string reason="message from client not masked";
                         send_close(connection, 1002, reason);
                         connection_close(connection, callbacks, 1002, reason);
                         return;
                     }
                     
-                    size_t length=(num_bytes[1]&127);
+                    size_t length=(first_bytes[1]&127);
 
                     if(length==126) {
                         //2 next bytes is the size of content
@@ -356,12 +363,12 @@ namespace SimpleWeb {
                     std::vector<unsigned char> mask;
                     mask.resize(4);
                     raw_message_data.read((char*)&mask[0], 4);
-
-                    boost::asio::streambuf databuf;
                     
-                    std::shared_ptr<std::istream> message_data(new std::istream(&databuf));
+                    std::shared_ptr<Message> message(new Message());
+                    message->length=length;
+                    message->fin_rsv_opcode=fin_rsv_opcode;
                     
-                    std::ostream message_data_out_stream(&databuf);
+                    std::ostream message_data_out_stream(&message->streambuf);
                     for(size_t c=0;c<length;c++) {
                         message_data_out_stream.put(raw_message_data.get()^mask[c%4]);
                     }
@@ -370,13 +377,13 @@ namespace SimpleWeb {
                     if((fin_rsv_opcode&0x0f)==8) {
                         int status=0;
                         if(length>=2) {
-                            unsigned char byte1=message_data->get();
-                            unsigned char byte2=message_data->get();
+                            unsigned char byte1=message->data.get();
+                            unsigned char byte2=message->data.get();
                             status=(byte1<<8)+byte2;
                         }
                         
                         std::stringstream reason_ss;
-                        reason_ss << message_data->rdbuf();
+                        reason_ss << message->data.rdbuf();
                         std::string reason=reason_ss.str();
                         
                         send_close(connection, status, reason);
@@ -391,10 +398,6 @@ namespace SimpleWeb {
                     }
                     else if(callbacks.onmessage) {
                         timer_idle_reset(connection);
-                        std::shared_ptr<Message> message(new Message());
-                        message->data=message_data;
-                        message->length=length;
-                        message->fin_rsv_opcode=fin_rsv_opcode;
                         callbacks.onmessage(connection, message);
                     }
 

@@ -21,7 +21,7 @@ int main() {
     echo.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
         stringstream data_ss;
-        *message->data >> data_ss.rdbuf();
+        message->data >> data_ss.rdbuf();
         
         cout << "Server: Message received: \"" << data_ss.str() << "\"" << endl;
                 
@@ -63,7 +63,7 @@ int main() {
     echo_all.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
         stringstream data_ss;
-        *message->data >> data_ss.rdbuf();
+        message->data >> data_ss.rdbuf();
         
         for(auto a_connection: server.get_connections()) {
             stringstream response_ss;
@@ -97,7 +97,7 @@ int main() {
     Client<WSS> client("localhost:8080/echo", false);
     client.onmessage=[&client](auto message) {    
         stringstream data_ss;
-        data_ss << message->data->rdbuf();
+        data_ss << message->data.rdbuf();
         cout << "Client: Message received: \"" << data_ss.str() << "\"" << endl;
         
         cout << "Client: Sending close connection" << endl;

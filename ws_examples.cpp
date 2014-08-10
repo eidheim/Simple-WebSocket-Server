@@ -4,6 +4,9 @@
 using namespace std;
 using namespace SimpleWeb;
 
+//TODO store Message::data's boost::asio::streambuf as shared_ptr in Message
+//TODO or as simply boost::asio::streambuf toghether with Message:data as istream
+
 int main() {
     //WebSocket (WS)-server at port 8080 using 4 threads
     Server<WS> server(8080, 4);
@@ -21,7 +24,7 @@ int main() {
     echo.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
         stringstream data_ss;
-        *message->data >> data_ss.rdbuf();
+        message->data >> data_ss.rdbuf();
         
         cout << "Server: Message received: \"" << data_ss.str() << "\"" << endl;
                 
@@ -63,7 +66,7 @@ int main() {
     echo_all.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
         stringstream data_ss;
-        *message->data >> data_ss.rdbuf();
+        message->data >> data_ss.rdbuf();
         
         for(auto a_connection: server.get_connections()) {
             stringstream response_ss;
@@ -96,7 +99,7 @@ int main() {
     Client<WS> client("localhost:8080/echo");
     client.onmessage=[&client](auto message) {    
         stringstream data_ss;
-        data_ss << message->data->rdbuf();
+        data_ss << message->data.rdbuf();
         cout << "Client: Message received: \"" << data_ss.str() << "\"" << endl;
         
         cout << "Client: Sending close connection" << endl;
