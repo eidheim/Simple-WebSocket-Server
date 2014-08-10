@@ -7,7 +7,7 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 
 ### Features
 
-* Most common parts of RFC 6455 are supported: single fragment text/binary messages.
+* RFC 6455 mostly supported: text/binary frames, ping-pong, connection close with status and reason.
 * Thread pool
 * Platform independent
 * WebSocket Secure support

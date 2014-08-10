@@ -38,9 +38,15 @@ namespace SimpleWeb {
             Connection(std::shared_ptr<socket_type> socket): socket(socket), closed(false) {}
         };
 
+        struct Message {
+            std::shared_ptr<std::istream> data;
+            size_t length;
+            unsigned char fin_rsv_opcode;
+        };
+        
         struct Callbacks {
             std::function<void(std::shared_ptr<Connection>)> onopen;
-            std::function<void(std::shared_ptr<Connection>, std::shared_ptr<std::istream>, size_t)> onmessage;
+            std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int)> onclose;
         };
@@ -66,12 +72,12 @@ namespace SimpleWeb {
             }
         }
         
-        //message_header: 129=one fragment, text, 130=one fragment, binary, 136=close connection
+        //fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection
         //See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
         void send(std::shared_ptr<Connection> connection, std::ostream& stream, 
                 const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
-                unsigned char message_header=129) {
-            if(message_header!=136)
+                unsigned char fin_rsv_opcode=129) {
+            if(fin_rsv_opcode!=136)
                 timer_idle_reset(connection);
             std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
             std::ostream response(write_buffer.get());
@@ -80,7 +86,7 @@ namespace SimpleWeb {
             size_t length=stream.tellp();
             stream.seekp(0, std::ios::beg);
             
-            response.put(message_header);
+            response.put(fin_rsv_opcode);
             //unmasked (first length byte<128)
             if(length>=126) {
                 int num_bytes;
@@ -126,7 +132,7 @@ namespace SimpleWeb {
             
             response << reason;
 
-            //message_header=136: message close
+            //fin_rsv_opcode=136: message close
             send(connection, response, [](const boost::system::error_code& ec){}, 136);
         }
         
@@ -271,7 +277,7 @@ namespace SimpleWeb {
                     num_bytes.resize(2);
                     stream.read((char*)&num_bytes[0], 2);
                     
-                    unsigned char opcode=(num_bytes[0]&0x0f);
+                    unsigned char fin_rsv_opcode=num_bytes[0];
                     
                     //Close connection if unmasked message from client (protocol error)
                     if(num_bytes[1]<128) {
@@ -285,7 +291,7 @@ namespace SimpleWeb {
                     if(length==126) {
                         //2 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
-                                [this, connection, read_buffer, &callbacks, opcode]
+                                [this, connection, read_buffer, &callbacks, fin_rsv_opcode]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
@@ -299,7 +305,7 @@ namespace SimpleWeb {
                                 for(int c=0;c<num_bytes;c++)
                                     length+=length_bytes[c]<<(8*(num_bytes-1-c));
                                 
-                                read_message_content(connection, read_buffer, length, callbacks, opcode);
+                                read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
                             }
                             else
                                 connection_error(connection, callbacks, ec);
@@ -308,7 +314,7 @@ namespace SimpleWeb {
                     else if(length==127) {
                         //8 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(8),
-                                [this, connection, read_buffer, &callbacks, opcode]
+                                [this, connection, read_buffer, &callbacks, fin_rsv_opcode]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
@@ -322,14 +328,14 @@ namespace SimpleWeb {
                                 for(int c=0;c<num_bytes;c++)
                                     length+=length_bytes[c]<<(8*(num_bytes-1-c));
 
-                                read_message_content(connection, read_buffer, length, callbacks, opcode);
+                                read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
                             }
                             else
                                 connection_error(connection, callbacks, ec);
                         });
                     }
                     else
-                        read_message_content(connection, read_buffer, length, callbacks, opcode);
+                        read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
                 }
                 else
                     connection_error(connection, callbacks, ec);
@@ -338,32 +344,33 @@ namespace SimpleWeb {
         
         void read_message_content(std::shared_ptr<Connection> connection, 
                 std::shared_ptr<boost::asio::streambuf> read_buffer, 
-                size_t length, Callbacks& callbacks, unsigned char opcode) {
+                size_t length, Callbacks& callbacks, unsigned char fin_rsv_opcode) {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(4+length),
-                    [this, connection, read_buffer, length, &callbacks, opcode]
+                    [this, connection, read_buffer, length, &callbacks, fin_rsv_opcode]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
-                    std::istream stream(read_buffer.get());
+                    std::istream raw_message_data(read_buffer.get());
 
+                    //Read mask
                     std::vector<unsigned char> mask;
                     mask.resize(4);
-                    stream.read((char*)&mask[0], 4);
+                    raw_message_data.read((char*)&mask[0], 4);
 
-                    boost::asio::streambuf contentbuf;
+                    boost::asio::streambuf databuf;
                     
-                    std::shared_ptr<std::istream> message(new std::istream(&contentbuf));
+                    std::shared_ptr<std::istream> message_data(new std::istream(&databuf));
                     
-                    std::ostream content(&contentbuf);
+                    std::ostream message_data_out_stream(&databuf);
                     for(size_t c=0;c<length;c++) {
-                        content.put(stream.get()^mask[c%4]);
+                        message_data_out_stream.put(raw_message_data.get()^mask[c%4]);
                     }
                     
-                    //If connection closed
-                    if(opcode==8) {
+                    //If connection close
+                    if((fin_rsv_opcode&0x0f)==8) {
                         int status=0;
                         if(length>=2) {
-                            unsigned char byte1=message->get();
-                            unsigned char byte2=message->get();
+                            unsigned char byte1=message_data->get();
+                            unsigned char byte2=message_data->get();
                             status=(byte1<<8)+byte2;
                         }
                         
@@ -371,10 +378,19 @@ namespace SimpleWeb {
                         connection_close(connection, callbacks, status);
                         return;
                     }
-                    
-                    if(callbacks.onmessage) {
+                    //If ping
+                    else if((fin_rsv_opcode&0x0f)==9) {
+                        //send pong
+                        std::stringstream empty_ss;
+                        send(connection, empty_ss, nullptr, fin_rsv_opcode+1);
+                    }
+                    else if(callbacks.onmessage) {
                         timer_idle_reset(connection);
-                        callbacks.onmessage(connection, message, length);
+                        std::shared_ptr<Message> message(new Message());
+                        message->data=message_data;
+                        message->length=length;
+                        message->fin_rsv_opcode=fin_rsv_opcode;
+                        callbacks.onmessage(connection, message);
                     }
 
                     //Next message

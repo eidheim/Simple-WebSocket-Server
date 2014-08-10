@@ -17,24 +17,24 @@ int main() {
     auto& echo=server.endpoint["^/echo/?$"];
     
     //C++14, lambda parameters declared with auto
-    //For C++11 use: (shared_ptr<Server<WSS>::Connection> connection, std::shared_ptr<std::istream> message, size_t message_length)
-    echo.onmessage=[&server](auto connection, auto message, size_t message_length) {
+    //For C++11 use: (shared_ptr<Server<WSS>::Connection> connection, shared_ptr<Server<WSS>::Message> message)
+    echo.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
-        stringstream message_stream;
-        *message >> message_stream.rdbuf();
+        stringstream data_ss;
+        *message->data >> data_ss.rdbuf();
         
-        cout << "Server: Message received: \"" << message_stream.str() << "\"" << endl;;
+        cout << "Server: Message received: \"" << data_ss.str() << "\"" << endl;
                 
-        cout << "Server: Sending message \"" << message_stream.str() <<  "\" to " << (size_t)connection.get() << endl;
+        cout << "Server: Sending message \"" << data_ss.str() <<  "\" to " << (size_t)connection.get() << endl;
         
         //server.send is an asynchronous function
-        server.send(connection, message_stream, [](const boost::system::error_code& ec){
+        server.send(connection, data_ss, [](const boost::system::error_code& ec){
             if(ec) {
                 cout << "Server: Error sending message. " <<
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
                         "Error: " << ec << ", error message: " << ec.message() << endl;
            }
-        });
+        });        
     };
     
     echo.onopen=[](auto connection) {
@@ -60,17 +60,17 @@ int main() {
     //    wss.onmessage=function(evt){console.log(evt.data);};
     //    wss.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](auto connection, auto message, size_t message_length) {
+    echo_all.onmessage=[&server](auto connection, auto message) {
         //To receive message from client as string (message_stream.str())
-        stringstream message_stream;
-        *message >> message_stream.rdbuf();
+        stringstream data_ss;
+        *message->data >> data_ss.rdbuf();
         
         for(auto a_connection: server.get_connections()) {
-            stringstream response_stream;
-            response_stream << message_stream.str();
+            stringstream response_ss;
+            response_ss << data_ss.str();
             
             //server.send is an asynchronous function
-            server.send(a_connection, response_stream);
+            server.send(a_connection, response_ss);
         }
     };
     
@@ -95,8 +95,10 @@ int main() {
     //Server: Closed connection 140243756912112 with status code 1000
     //Client: Closed connection with status code 1000
     Client<WSS> client("localhost:8080/echo", false);
-    client.onmessage=[&client](auto message, size_t message_length) {
-        cout << "Client: Message received: \"" << message->rdbuf() << "\"" << endl;
+    client.onmessage=[&client](auto message) {    
+        stringstream data_ss;
+        data_ss << message->data->rdbuf();
+        cout << "Client: Message received: \"" << data_ss.str() << "\"" << endl;
         
         cout << "Client: Sending close connection" << endl;
         client.send_close(1000);
