@@ -38,7 +38,7 @@ namespace SimpleWeb {
         std::function<void(void)> onopen;
         std::function<void(std::shared_ptr<Message>)> onmessage;
         std::function<void(const boost::system::error_code&)> onerror;
-        std::function<void(int)> onclose;
+        std::function<void(int, const std::string&)> onclose;
         
         void start() {
             connect();
@@ -243,9 +243,10 @@ namespace SimpleWeb {
                     
                     //Close connection if masked message from server (protocol error)
                     if(num_bytes[1]>=128) {
-                        send_close(1002, "message from server masked");
+                        const std::string reason="message from server masked";
+                        send_close(1002, reason);
                         if(onclose)
-                            onclose(1002);
+                            onclose(1002, reason);
                         return;
                     }
                     
@@ -327,9 +328,13 @@ namespace SimpleWeb {
                             status=(byte1<<8)+byte2;
                         }
                         
-                        send_close(status);
+                        std::stringstream reason_ss;
+                        reason_ss << message_data->rdbuf();
+                        std::string reason=reason_ss.str();
+                        
+                        send_close(status, reason);
                         if(onclose)
-                            onclose(status);
+                            onclose(status, reason);
                         return;
                     }
                     //If ping

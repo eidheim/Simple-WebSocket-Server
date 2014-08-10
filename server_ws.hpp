@@ -48,7 +48,7 @@ namespace SimpleWeb {
             std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
-            std::function<void(std::shared_ptr<Connection>, int)> onclose;
+            std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
         };
         
         std::map<std::string, Callbacks> endpoint;        
@@ -281,8 +281,9 @@ namespace SimpleWeb {
                     
                     //Close connection if unmasked message from client (protocol error)
                     if(num_bytes[1]<128) {
-                        send_close(connection, 1002, "message from client not masked");
-                        connection_close(connection, callbacks, 1002);
+                        const std::string reason="message from client not masked";
+                        send_close(connection, 1002, reason);
+                        connection_close(connection, callbacks, 1002, reason);
                         return;
                     }
                     
@@ -374,8 +375,12 @@ namespace SimpleWeb {
                             status=(byte1<<8)+byte2;
                         }
                         
-                        send_close(connection, status);
-                        connection_close(connection, callbacks, status);
+                        std::stringstream reason_ss;
+                        reason_ss << message_data->rdbuf();
+                        std::string reason=reason_ss.str();
+                        
+                        send_close(connection, status, reason);
+                        connection_close(connection, callbacks, status, reason);
                         return;
                     }
                     //If ping
@@ -410,13 +415,13 @@ namespace SimpleWeb {
                 callbacks.onopen(connection);
         }
         
-        void connection_close(std::shared_ptr<Connection> connection, const Callbacks& callbacks, int status) {
+        void connection_close(std::shared_ptr<Connection> connection, const Callbacks& callbacks, int status, const std::string& reason) {
             timer_idle_cancel(connection);
             connections_mutex.lock();
             connections.erase(connection);
             connections_mutex.unlock();
             if(callbacks.onclose)
-                callbacks.onclose(connection, status);
+                callbacks.onclose(connection, status, reason);
         }
         
         void connection_error(std::shared_ptr<Connection> connection, const Callbacks& callbacks, const boost::system::error_code& ec) {

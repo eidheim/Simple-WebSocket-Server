@@ -42,7 +42,7 @@ int main() {
     };
     
     //See RFC 6455 7.4.1. for status codes
-    echo.onclose=[](auto connection, int status) {
+    echo.onclose=[](auto connection, int status, const string& reason) {
         cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
@@ -113,7 +113,7 @@ int main() {
         client.send(ss);
     };
     
-    client.onclose=[](int status) {
+    client.onclose=[](int status, const string& reason) {
         cout << "Client: Closed connection with status code " << status << endl;
     };
     
