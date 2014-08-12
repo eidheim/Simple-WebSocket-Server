@@ -16,11 +16,15 @@
 
 namespace SimpleWeb {
     template <class socket_type>
+    class Server;
+        
+    template <class socket_type>
     class SocketServerBase {
     public:
         class Connection {
-            friend class SocketServerBase<socket_type>;
-
+            friend class SocketServerBase<socket_type>;;
+            friend class Server<socket_type>;
+            
         public:
             std::string method, path, http_version;
 
@@ -28,16 +32,17 @@ namespace SimpleWeb {
 
             std::smatch path_match;
             
-        private:
-            std::shared_ptr<socket_type> socket;
+        protected:
+            //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
+            std::unique_ptr<socket_type> socket;
             
             std::atomic<bool> closed;
 
-            std::shared_ptr<boost::asio::deadline_timer> timer_idle;
+            std::unique_ptr<boost::asio::deadline_timer> timer_idle;
 
-            Connection(std::shared_ptr<socket_type> socket): socket(socket), closed(false) {}
+            Connection(socket_type* socket_ptr): socket(socket_ptr), closed(false) {}
         };
-
+        
         class Message {
             friend class SocketServerBase<socket_type>;
             
@@ -47,8 +52,8 @@ namespace SimpleWeb {
             unsigned char fin_rsv_opcode;
             
         private:
-            Message(): data(&streambuf) {}
-            boost::asio::streambuf streambuf;
+            Message(): data(&data_buffer) {}
+            boost::asio::streambuf data_buffer;
         };
         
         struct Callbacks {
@@ -171,9 +176,10 @@ namespace SimpleWeb {
         
         virtual void accept()=0;
         
-        virtual std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_socket(std::shared_ptr<socket_type> socket, size_t seconds)=0;
+        virtual std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, 
+                size_t seconds)=0;
 
-        void read_handshake(std::shared_ptr<socket_type> socket) {
+        void read_handshake(std::shared_ptr<Connection> connection) {
             //Create new read_buffer for async_read_until()
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
@@ -181,10 +187,10 @@ namespace SimpleWeb {
             //Set timeout on the following boost::asio::async-read or write function
             std::shared_ptr<boost::asio::deadline_timer> timer;
             if(timeout_request>0)
-                timer=set_timeout_on_socket(socket, timeout_request);
+                timer=set_timeout_on_connection(connection, timeout_request);
             
-            boost::asio::async_read_until(*socket, *read_buffer, "\r\n\r\n",
-                    [this, socket, read_buffer, timer]
+            boost::asio::async_read_until(*connection->socket, *read_buffer, "\r\n\r\n",
+                    [this, connection, read_buffer, timer]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(timeout_request>0)
                     timer->cancel();
@@ -192,7 +198,6 @@ namespace SimpleWeb {
                     //Convert to istream to extract string-lines
                     std::istream stream(read_buffer.get());
 
-                    std::shared_ptr<Connection> connection(new Connection(socket));
                     parse_handshake(connection, stream);
                     
                     write_handshake(connection, read_buffer);
@@ -368,7 +373,7 @@ namespace SimpleWeb {
                     message->length=length;
                     message->fin_rsv_opcode=fin_rsv_opcode;
                     
-                    std::ostream message_data_out_stream(&message->streambuf);
+                    std::ostream message_data_out_stream(&message->data_buffer);
                     for(size_t c=0;c<length;c++) {
                         message_data_out_stream.put(raw_message_data.get()^mask[c%4]);
                     }
@@ -440,7 +445,7 @@ namespace SimpleWeb {
         
         void timer_idle_init(std::shared_ptr<Connection> connection) {
             if(timeout_idle>0) {
-                connection->timer_idle=std::make_shared<boost::asio::deadline_timer>(asio_io_service);
+                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(asio_io_service));
                 connection->timer_idle->expires_from_now(boost::posix_time::seconds(timeout_idle));
                 timer_idle_expired_function(connection);
             }
@@ -478,26 +483,26 @@ namespace SimpleWeb {
         
     private:
         void accept() {
-            //Create new socket for this connection
+            //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<WS> socket(new WS(asio_io_service));
-
-            asio_acceptor.async_accept(*socket, [this, socket](const boost::system::error_code& ec) {
+            std::shared_ptr<Connection> connection(new Connection(new WS(asio_io_service)));
+            
+            asio_acceptor.async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
                 //Immediately start accepting a new connection
                 accept();
                 if(!ec) {
-                    read_handshake(socket);
+                    read_handshake(connection);
                 }
             });
         }
         
-        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_socket(std::shared_ptr<WS> socket, size_t seconds) {
+        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
             std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(asio_io_service));
             timer->expires_from_now(boost::posix_time::seconds(seconds));
-            timer->async_wait([socket](const boost::system::error_code& ec){
+            timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
-                    socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-                    socket->close();
+                    connection->socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+                    connection->socket->close();
                 }
             });
             return timer;

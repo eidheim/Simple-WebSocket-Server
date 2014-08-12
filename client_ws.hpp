@@ -12,22 +12,26 @@
 
 namespace SimpleWeb {
     template <class socket_type>
+    class Client;
+    
+    template <class socket_type>
     class SocketClientBase {
     public:
         class Connection {
             friend class SocketClientBase<socket_type>;
+            friend class Client<socket_type>;
 
         public:
             std::unordered_map<std::string, std::string> header;
             
-            Connection(std::shared_ptr<socket_type> socket): socket(socket), closed(false) {}
+            Connection(socket_type* socket): socket(socket), closed(false) {}
         private:
-            std::shared_ptr<socket_type> socket;
+            std::unique_ptr<socket_type> socket;
             
             std::atomic<bool> closed;
         };
         
-        std::shared_ptr<Connection> connection;
+        std::unique_ptr<Connection> connection;
         
         class Message {
             friend class SocketClientBase<socket_type>;
@@ -38,8 +42,8 @@ namespace SimpleWeb {
             unsigned char fin_rsv_opcode;
             
         private:
-            Message(): data(&streambuf) {}
-            boost::asio::streambuf streambuf;
+            Message(): data(&data_buffer) {}
+            boost::asio::streambuf data_buffer;
         };
         
         std::function<void(void)> onopen;
@@ -158,7 +162,7 @@ namespace SimpleWeb {
         
         virtual void connect()=0;
         
-        void handshake(std::shared_ptr<socket_type> socket) {
+        void handshake() {
             std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
             
             std::ostream request(write_buffer.get());
@@ -184,17 +188,16 @@ namespace SimpleWeb {
             //test this to base64::decode(Sec-WebSocket-Accept)
             std::shared_ptr<std::string> accept_sha1(new std::string(Crypto::SHA1(nonce_base64+ws_magic_string)));
             
-            boost::asio::async_write(*socket, *write_buffer, 
-                    [this, socket, write_buffer, accept_sha1]
+            boost::asio::async_write(*connection->socket, *write_buffer, 
+                    [this, write_buffer, accept_sha1]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
                     std::shared_ptr<Message> message(new Message());
 
-                    boost::asio::async_read_until(*socket, message->streambuf, "\r\n\r\n",
-                            [this, socket, message, accept_sha1]
+                    boost::asio::async_read_until(*connection->socket, message->data_buffer, "\r\n\r\n",
+                            [this, message, accept_sha1]
                             (const boost::system::error_code& ec, size_t bytes_transferred) {
                         if(!ec) {                            
-                            connection=std::make_shared<Connection>(socket);
                             parse_handshake(message->data);
                             if(Crypto::Base64::decode(connection->header["Sec-WebSocket-Accept"])==*accept_sha1) {
                                 if(onopen)
@@ -234,7 +237,7 @@ namespace SimpleWeb {
         }
         
         void read_message(std::shared_ptr<Message> message) {
-            boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(2),
+            boost::asio::async_read(*connection->socket, message->data_buffer, boost::asio::transfer_exactly(2),
                     [this, message](const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
                     std::vector<unsigned char> first_bytes;
@@ -256,7 +259,7 @@ namespace SimpleWeb {
                     
                     if(length==126) {
                         //2 next bytes is the size of content
-                        boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(2),
+                        boost::asio::async_read(*connection->socket, message->data_buffer, boost::asio::transfer_exactly(2),
                                 [this, message]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
@@ -280,7 +283,7 @@ namespace SimpleWeb {
                     }
                     else if(length==127) {
                         //8 next bytes is the size of content
-                        boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(8),
+                        boost::asio::async_read(*connection->socket, message->data_buffer, boost::asio::transfer_exactly(8),
                                 [this, message]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
@@ -314,7 +317,7 @@ namespace SimpleWeb {
         }
         
         void read_message_content(std::shared_ptr<Message> message) {
-            boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(message->length), 
+            boost::asio::async_read(*connection->socket, message->data_buffer, boost::asio::transfer_exactly(message->length), 
                     [this, message]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
@@ -375,12 +378,12 @@ namespace SimpleWeb {
             asio_resolver.async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    std::shared_ptr<WS> socket(new WS(asio_io_service));
+                    connection=std::unique_ptr<Connection>(new Connection(new WS(asio_io_service)));
 
-                    boost::asio::async_connect(*socket, it, [this, socket]
+                    boost::asio::async_connect(*connection->socket, it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                         if(!ec) {
-                            handshake(socket);
+                            handshake();
                         }
                         else
                             throw std::invalid_argument(ec.message());

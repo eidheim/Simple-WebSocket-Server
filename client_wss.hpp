@@ -27,14 +27,15 @@ namespace SimpleWeb {
             asio_resolver.async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    std::shared_ptr<WSS> socket(new WSS(asio_io_service, asio_context));
-                    boost::asio::async_connect(socket->lowest_layer(), it, [this, socket]
+                    connection=std::unique_ptr<Connection>(new Connection(new WSS(asio_io_service, asio_context)));
+                    
+                    boost::asio::async_connect(connection->socket->lowest_layer(), it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                         if(!ec) {
-                            socket->async_handshake(boost::asio::ssl::stream_base::client, 
-                                    [this, socket](const boost::system::error_code& ec) {
+                            connection->socket->async_handshake(boost::asio::ssl::stream_base::client, 
+                                    [this](const boost::system::error_code& ec) {
                                 if(!ec)
-                                    handshake(socket);
+                                    handshake();
                                 else
                                     throw std::invalid_argument(ec.message());
                             });
@@ -51,4 +52,3 @@ namespace SimpleWeb {
 }
 
 #endif	/* CLIENT_WSS_HPP */
-
