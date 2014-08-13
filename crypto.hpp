@@ -15,7 +15,7 @@ namespace SimpleWeb {
     namespace Crypto {
         namespace Base64 {
             template<class type>
-            type encode(const type& ascii) {
+            void encode(const type& ascii, type& base64) {
                 BIO *bio, *b64;
                 BUF_MEM *bptr;
 
@@ -24,8 +24,7 @@ namespace SimpleWeb {
                 BIO_push(b64, bio);
                 BIO_get_mem_ptr(b64, &bptr);
 
-                //Write directly to base64-string buffer to avoid copy
-                type base64;
+                //Write directly to base64-buffer to avoid copy
                 int base64_length=round(4*ceil((double)ascii.size()/3.0));
                 base64.resize(base64_length);
                 bptr->length=0;
@@ -41,14 +40,17 @@ namespace SimpleWeb {
                 bptr->data=nullptr;
 
                 BIO_free_all(b64);
-
+            }
+            template<class type>
+            type encode(const type& ascii) {
+                type base64;
+                encode(ascii, base64);
                 return base64;
             }
             
             template<class type>
-            type decode(const type& base64) {
-                type ascii;
-                //Resize resulting ascii-string, however, the size is a up to two bytes too large.
+            void decode(const type& base64, type& ascii) {
+                //Resize ascii, however, the size is a up to two bytes too large.
                 ascii.resize((6*base64.size())/8);
                 BIO *b64, *bio;
 
@@ -61,57 +63,78 @@ namespace SimpleWeb {
                 ascii.resize(decoded_length);
 
                 BIO_free_all(b64);
-
+            }
+            template<class type>
+            type decode(const type& base64) {
+                type ascii;
+                decode(base64, ascii);
                 return ascii;
             }
+
         }
         
         template<class type>
-        type MD5(const type& text) {
-            type encoded;
-            encoded.resize(128/8);
+        void MD5(const type& input, type& hash) {
+            hash.resize(128/8);
 
             MD5_CTX context;
             MD5_Init(&context);
-            MD5_Update(&context, &text[0], text.size());
-            MD5_Final((unsigned char*)&encoded[0], &context);
-            return encoded;
+            MD5_Update(&context, &input[0], input.size());
+            MD5_Final((unsigned char*)&hash[0], &context);
+        }
+        template<class type>
+        type MD5(const type& text) {
+            type hash;
+            MD5(text, hash);
+            return hash;
         }
 
         template<class type>
-        type SHA1(const type& text) {
-            type encoded;
-            encoded.resize(160/8);
+        void SHA1(const type& input, type& hash) {
+            hash.resize(160/8);
 
             SHA_CTX context;
             SHA1_Init(&context);
-            SHA1_Update(&context, &text[0], text.size());
-            SHA1_Final((unsigned char*)&encoded[0], &context);
-            return encoded;
+            SHA1_Update(&context, &input[0], input.size());
+            SHA1_Final((unsigned char*)&hash[0], &context);
+        }
+        template<class type>
+        type SHA1(const type& input) {
+            type hash;
+            SHA1(input, hash);
+            return hash;
         }
 
         template<class type>
-        type SHA256(const type& text) {
-            type encoded;
-            encoded.resize(256/8);
+        void SHA256(const type& input, type& hash) {
+            hash.resize(256/8);
 
             SHA256_CTX context;
             SHA256_Init(&context);
-            SHA256_Update(&context, &text[0], text.size());
-            SHA256_Final((unsigned char*)&encoded[0], &context);
-            return encoded;
+            SHA256_Update(&context, &input[0], input.size());
+            SHA256_Final((unsigned char*)&hash[0], &context);
+        }
+        template<class type>
+        type SHA256(const type& input) {
+            type hash;
+            SHA256(input, hash);
+            return hash;
         }
 
         template<class type>
-        type SHA512(const type& text) {
-            type encoded;
-            encoded.resize(512/8);
+        void SHA512(const type& input, type& hash) {
+            hash.resize(512/8);
 
             SHA512_CTX context;
             SHA512_Init(&context);
-            SHA512_Update(&context, &text[0], text.size());
-            SHA512_Final((unsigned char*)&encoded[0], &context);
-            return encoded;
+            SHA512_Update(&context, &input[0], input.size());
+            SHA512_Final((unsigned char*)&hash[0], &context);
+        }
+        template<class type>
+        type SHA512(const type& input) {
+            type hash;
+            SHA512(input, hash);
+            return hash;
         }
     }
 }
