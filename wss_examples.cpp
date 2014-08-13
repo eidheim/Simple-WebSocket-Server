@@ -23,7 +23,7 @@ int main() {
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
         
-        cout << "Server: Message received: \"" << data_ss.str() << "\"" << endl;
+        cout << "Server: Message received: \"" << data_ss.str() << "\" from " << (size_t)connection.get() << endl;
                 
         cout << "Server: Sending message \"" << data_ss.str() <<  "\" to " << (size_t)connection.get() << endl;
         
@@ -85,14 +85,14 @@ int main() {
     //Example 3: Client communication with server
     //Second Client() parameter set to false: no certificate verification
     //Possible output:
-    //Server: Opened connection 140243756912112
+    //Server: Opened connection 140184920260656
     //Client: Opened connection
     //Client: Sending message: "Hello"
-    //Server: Message received: "Hello"
-    //Server: Sending message "Hello" to 140243756912112
+    //Server: Message received: "Hello" from 140184920260656
+    //Server: Sending message "Hello" to 140184920260656
     //Client: Message received: "Hello"
     //Client: Sending close connection
-    //Server: Closed connection 140243756912112 with status code 1000
+    //Server: Closed connection 140184920260656 with status code 1000
     //Client: Closed connection with status code 1000
     Client<WSS> client("localhost:8080/echo", false);
     client.onmessage=[&client](auto message) {    
