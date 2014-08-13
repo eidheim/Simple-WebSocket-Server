@@ -32,6 +32,8 @@ ws_examples.cpp and wss_examples.cpp use C++14 features.
 
 Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
+On Linux using g++: add -pthread
+
 #### WS
 
 g++ -O3 -std=c++1y -lboost_system -lcrypto ws_examples.cpp -o ws_examples
