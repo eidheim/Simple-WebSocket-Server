@@ -38,7 +38,7 @@ On Linux using g++: add -pthread
 
 g++ -O3 -std=c++1y -lboost_system -lcrypto ws_examples.cpp -o ws_examples
 
-Then to run the server: ./ws_examples
+Then to run the server and client examples: ./ws_examples
 
 #### WSS
 
@@ -46,4 +46,4 @@ g++ -O3 -std=c++1y -lboost_system -lssl -lcrypto wss_examples.cpp -o wss_example
 
 Before running, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
-Then to run the server: ./wss_examples
+Then to run the server and client examples: ./wss_examples
