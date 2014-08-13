@@ -83,9 +83,9 @@ namespace SimpleWeb {
             MD5_Final((unsigned char*)&hash[0], &context);
         }
         template<class type>
-        type MD5(const type& text) {
+        type MD5(const type& input) {
             type hash;
-            MD5(text, hash);
+            MD5(input, hash);
             return hash;
         }
 
