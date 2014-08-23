@@ -76,11 +76,11 @@ namespace SimpleWeb {
         
         template<class type>
         void MD5(const type& input, type& hash) {
-            hash.resize(128/8);
-
             MD5_CTX context;
             MD5_Init(&context);
             MD5_Update(&context, &input[0], input.size());
+            
+            hash.resize(128/8);
             MD5_Final((unsigned char*)&hash[0], &context);
         }
         template<class type>
@@ -92,11 +92,11 @@ namespace SimpleWeb {
 
         template<class type>
         void SHA1(const type& input, type& hash) {
-            hash.resize(160/8);
-
             SHA_CTX context;
             SHA1_Init(&context);
             SHA1_Update(&context, &input[0], input.size());
+            
+            hash.resize(160/8);
             SHA1_Final((unsigned char*)&hash[0], &context);
         }
         template<class type>
@@ -108,11 +108,11 @@ namespace SimpleWeb {
 
         template<class type>
         void SHA256(const type& input, type& hash) {
-            hash.resize(256/8);
-
             SHA256_CTX context;
             SHA256_Init(&context);
             SHA256_Update(&context, &input[0], input.size());
+            
+            hash.resize(256/8);
             SHA256_Final((unsigned char*)&hash[0], &context);
         }
         template<class type>
@@ -124,11 +124,11 @@ namespace SimpleWeb {
 
         template<class type>
         void SHA512(const type& input, type& hash) {
-            hash.resize(512/8);
-
             SHA512_CTX context;
             SHA512_Init(&context);
             SHA512_Update(&context, &input[0], input.size());
+            
+            hash.resize(512/8);
             SHA512_Final((unsigned char*)&hash[0], &context);
         }
         template<class type>
