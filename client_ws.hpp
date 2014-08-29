@@ -12,14 +12,14 @@
 
 namespace SimpleWeb {
     template <class socket_type>
-    class Client;
+    class SocketClient;
     
     template <class socket_type>
     class SocketClientBase {
     public:
         class Connection {
             friend class SocketClientBase<socket_type>;
-            friend class Client<socket_type>;
+            friend class SocketClient<socket_type>;
 
         public:
             std::unordered_map<std::string, std::string> header;
@@ -362,14 +362,14 @@ namespace SimpleWeb {
     };
     
     template<class socket_type>
-    class Client : public SocketClientBase<socket_type> {};
+    class SocketClient : public SocketClientBase<socket_type> {};
     
     typedef boost::asio::ip::tcp::socket WS;
     
     template<>
-    class Client<WS> : public SocketClientBase<WS> {
+    class SocketClient<WS> : public SocketClientBase<WS> {
     public:
-        Client(const std::string& server_port_path) : SocketClientBase<WS>::SocketClientBase(server_port_path, 80) {};
+        SocketClient(const std::string& server_port_path) : SocketClientBase<WS>::SocketClientBase(server_port_path, 80) {};
         
     private:
         void connect() {

@@ -6,7 +6,7 @@ using namespace SimpleWeb;
 
 int main() {
     //WebSocket (WS)-server at port 8080 using 4 threads
-    Server<WS> server(8080, 4);
+    SocketServer<WS> server(8080, 4);
     
     //Example 1: echo WebSocket endpoint
     //  Added debug messages for example use of the callbacks
@@ -93,7 +93,7 @@ int main() {
     //Client: Sending close connection
     //Server: Closed connection 140184920260656 with status code 1000
     //Client: Closed connection with status code 1000
-    Client<WS> client("localhost:8080/echo");
+    SocketClient<WS> client("localhost:8080/echo");
     client.onmessage=[&client](auto message) {    
         stringstream data_ss;
         data_ss << message->data.rdbuf();

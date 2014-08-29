@@ -1,5 +1,5 @@
-#ifndef SERVER_HTTP_HPP
-#define	SERVER_HTTP_HPP
+#ifndef SERVER_WS_HPP
+#define	SERVER_WS_HPP
 
 #include "crypto.hpp"
 
@@ -16,14 +16,14 @@
 
 namespace SimpleWeb {
     template <class socket_type>
-    class Server;
+    class SocketServer;
         
     template <class socket_type>
     class SocketServerBase {
     public:
         class Connection {
             friend class SocketServerBase<socket_type>;;
-            friend class Server<socket_type>;
+            friend class SocketServer<socket_type>;
             
         public:
             std::string method, path, http_version;
@@ -471,14 +471,14 @@ namespace SimpleWeb {
     };
     
     template<class socket_type>
-    class Server : public SocketServerBase<socket_type> {};
+    class SocketServer : public SocketServerBase<socket_type> {};
     
     typedef boost::asio::ip::tcp::socket WS;
     
     template<>
-    class Server<WS> : public SocketServerBase<WS> {
+    class SocketServer<WS> : public SocketServerBase<WS> {
     public:
-        Server(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
+        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
                 SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle) {};
         
     private:
@@ -509,4 +509,4 @@ namespace SimpleWeb {
         }
     };
 }
-#endif	/* SERVER_HTTP_HPP */
+#endif	/* SERVER_WS_HPP */

@@ -8,10 +8,10 @@ namespace SimpleWeb {
     typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> WSS;    
         
     template<>
-    class Server<WSS> : public SocketServerBase<WSS> {
+    class SocketServer<WSS> : public SocketServerBase<WSS> {
         
     public:
-        Server(unsigned short port, size_t num_threads, const std::string& cert_file, const std::string& private_key_file, 
+        SocketServer(unsigned short port, size_t num_threads, const std::string& cert_file, const std::string& private_key_file, 
                 size_t timeout_request=5, size_t timeout_idle=0) : 
                 SocketServerBase<WSS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle), 
                 asio_context(boost::asio::ssl::context::sslv23) {

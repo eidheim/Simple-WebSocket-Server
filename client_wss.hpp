@@ -8,9 +8,9 @@ namespace SimpleWeb {
     typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> WSS;    
     
     template<>
-    class Client<WSS> : public SocketClientBase<WSS> {
+    class SocketClient<WSS> : public SocketClientBase<WSS> {
     public:
-        Client(const std::string& server_port_path, bool verify_certificate=true) : SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
+        SocketClient(const std::string& server_port_path, bool verify_certificate=true) : SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
                 asio_context(boost::asio::ssl::context::sslv23) {
             if(verify_certificate)
                 asio_context.set_verify_mode(boost::asio::ssl::verify_peer);
