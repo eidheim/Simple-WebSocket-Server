@@ -19,7 +19,7 @@ int main() {
     //C++14, lambda parameters declared with auto
     //For C++11 use: (shared_ptr<Server<WS>::Connection> connection, shared_ptr<Server<WS>::Message> message)
     echo.onmessage=[&server](auto connection, auto message) {
-        //To receive message from client as string (message_stream.str())
+        //To receive message from client as string (data_ss.str())
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
         
@@ -61,7 +61,7 @@ int main() {
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
     echo_all.onmessage=[&server](auto connection, auto message) {
-        //To receive message from client as string (message_stream.str())
+        //To receive message from client as string (data_ss.str())
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
         
