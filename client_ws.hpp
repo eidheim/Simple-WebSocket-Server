@@ -22,15 +22,25 @@ namespace SimpleWeb {
             friend class SocketClient<socket_type>;
 
         public:
-            boost::asio::ip::address address() { return socket->next_layer().remote_endpoint().address(); }
-        
             std::unordered_map<std::string, std::string> header;
+            boost::asio::ip::address remote_endpoint_address;
+            unsigned short remote_endpoint_port;
             
             Connection(socket_type* socket): socket(socket), closed(false) {}
         private:
             std::unique_ptr<socket_type> socket;
             
             std::atomic<bool> closed;
+            
+            void read_remote_endpoint_data() {
+                try {
+                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address();
+                    remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
+                }
+                catch(const std::exception& e) {
+                    std::cerr << e.what() << std::endl;
+                }
+            }
         };
         
         std::unique_ptr<Connection> connection;
@@ -165,6 +175,8 @@ namespace SimpleWeb {
         virtual void connect()=0;
         
         void handshake() {
+            connection->read_remote_endpoint_data();
+            
             std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
             
             std::ostream request(write_buffer.get());

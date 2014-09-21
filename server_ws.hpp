@@ -32,7 +32,10 @@ namespace SimpleWeb {
 
             std::smatch path_match;
             
-        protected:
+            boost::asio::ip::address remote_endpoint_address;
+            unsigned short remote_endpoint_port;
+            
+        private:
             //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
             std::unique_ptr<socket_type> socket;
             
@@ -41,6 +44,16 @@ namespace SimpleWeb {
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
 
             Connection(socket_type* socket_ptr): socket(socket_ptr), closed(false) {}
+            
+            void read_remote_endpoint_data() {
+                try {
+                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address();
+                    remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
+                }
+                catch(const std::exception& e) {
+                    std::cerr << e.what() << std::endl;
+                }
+            }
         };
         
         class Message {
@@ -180,6 +193,8 @@ namespace SimpleWeb {
                 size_t seconds)=0;
 
         void read_handshake(std::shared_ptr<Connection> connection) {
+            connection->read_remote_endpoint_data();
+            
             //Create new read_buffer for async_read_until()
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
