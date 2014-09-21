@@ -22,6 +22,8 @@ namespace SimpleWeb {
             friend class SocketClient<socket_type>;
 
         public:
+            boost::asio::ip::address address() { return socket->next_layer().remote_endpoint().address(); }
+        
             std::unordered_map<std::string, std::string> header;
             
             Connection(socket_type* socket): socket(socket), closed(false) {}
