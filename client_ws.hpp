@@ -69,6 +69,10 @@ namespace SimpleWeb {
             asio_io_service.run();
         }
         
+        void stop() {
+            asio_io_service.stop();
+        }
+        
         void send(std::iostream& stream, const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
                 unsigned char fin_rsv_opcode=129) {
             //Create mask

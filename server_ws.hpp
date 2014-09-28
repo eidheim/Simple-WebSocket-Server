@@ -97,6 +97,10 @@ namespace SimpleWeb {
             }
         }
         
+        void stop() {
+            asio_io_service.stop();
+        }
+        
         //fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection
         //See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
         void send(std::shared_ptr<Connection> connection, std::ostream& stream, 
