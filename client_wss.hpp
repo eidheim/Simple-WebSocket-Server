@@ -17,6 +17,12 @@ namespace SimpleWeb {
             else
                 asio_context.set_verify_mode(boost::asio::ssl::verify_none);
         };
+        
+        SocketClient(const std::string& server_port_path, const std::string& verify_file) : SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
+                asio_context(boost::asio::ssl::context::sslv23) {
+                asio_context.set_verify_mode(boost::asio::ssl::verify_peer);
+                asio_context.load_verify_file(verify_file);
+        };
 
     private:
         boost::asio::ssl::context asio_context;
