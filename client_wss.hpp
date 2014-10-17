@@ -10,7 +10,9 @@ namespace SimpleWeb {
     template<>
     class SocketClient<WSS> : public SocketClientBase<WSS> {
     public:
-        SocketClient(const std::string& server_port_path, bool verify_certificate=true, const std::string& verify_file="", const std::string& cert_file="", const std::string& private_key_file="") : SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
+        SocketClient(const std::string& server_port_path, bool verify_certificate=true, const std::string& verify_file="", 
+                const std::string& cert_file="", const std::string& private_key_file="") : 
+                SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
                 asio_context(boost::asio::ssl::context::sslv23) {
             if(verify_certificate)
                 asio_context.set_verify_mode(boost::asio::ssl::verify_peer);
