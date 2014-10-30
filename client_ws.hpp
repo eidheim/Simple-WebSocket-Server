@@ -324,8 +324,10 @@ namespace SimpleWeb {
                         });
                     }
                     else
+                    {
                         message->length=length;
                         read_message_content(message);
+                    }
                 }
                 else {
                     if(onerror)
