@@ -193,8 +193,17 @@ namespace SimpleWeb {
         
         virtual void accept()=0;
         
-        virtual std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, 
-                size_t seconds)=0;
+        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
+            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(asio_io_service));
+            timer->expires_from_now(boost::posix_time::seconds(seconds));
+            timer->async_wait([connection](const boost::system::error_code& ec){
+                if(!ec) {
+                    connection->socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+                    connection->socket->lowest_layer().close();
+                }
+            });
+            return timer;
+        }
 
         void read_handshake(std::shared_ptr<Connection> connection) {
             connection->read_remote_endpoint_data();
@@ -513,18 +522,6 @@ namespace SimpleWeb {
                     read_handshake(connection);
                 }
             });
-        }
-        
-        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
-            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(asio_io_service));
-            timer->expires_from_now(boost::posix_time::seconds(seconds));
-            timer->async_wait([connection](const boost::system::error_code& ec){
-                if(!ec) {
-                    connection->socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-                    connection->socket->close();
-                }
-            });
-            return timer;
         }
     };
 }

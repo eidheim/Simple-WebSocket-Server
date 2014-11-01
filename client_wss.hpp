@@ -10,22 +10,24 @@ namespace SimpleWeb {
     template<>
     class SocketClient<WSS> : public SocketClientBase<WSS> {
     public:
-        SocketClient(const std::string& server_port_path, bool verify_certificate=true, const std::string& verify_file="", 
-                const std::string& cert_file="", const std::string& private_key_file="") : 
+        SocketClient(const std::string& server_port_path, bool verify_certificate=true, 
+                const std::string& cert_file=std::string(), const std::string& private_key_file=std::string(), 
+                const std::string& verify_file=std::string()) : 
                 SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
                 asio_context(boost::asio::ssl::context::sslv23) {
             if(verify_certificate)
                 asio_context.set_verify_mode(boost::asio::ssl::verify_peer);
             else
                 asio_context.set_verify_mode(boost::asio::ssl::verify_none);
-
-            if(verify_file!="")
-                asio_context.load_verify_file(verify_file);
             
-            if(cert_file!="" && private_key_file!="") {
+            if(cert_file.size()>0 && private_key_file.size()>0) {
                 asio_context.use_certificate_chain_file(cert_file);
                 asio_context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             }
+            
+            if(verify_file.size()>0)
+                asio_context.load_verify_file(verify_file);
+
         };
 
     private:

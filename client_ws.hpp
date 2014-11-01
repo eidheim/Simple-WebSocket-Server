@@ -323,8 +323,7 @@ namespace SimpleWeb {
                             }
                         });
                     }
-                    else
-                    {
+                    else {
                         message->length=length;
                         read_message_content(message);
                     }
