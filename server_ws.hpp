@@ -13,6 +13,7 @@
 #include <memory>
 
 #include <iostream>
+#include <fstream>
 
 namespace SimpleWeb {
     template <class socket_type>
@@ -187,9 +188,20 @@ namespace SimpleWeb {
         size_t timeout_request;
         size_t timeout_idle;
         
-        SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
+        std::string document_root;
+
+        SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle, std::string document_root) :
                 asio_endpoint(boost::asio::ip::tcp::v4(), port), asio_acceptor(asio_io_service, asio_endpoint), num_threads(num_threads),
-                timeout_request(timeout_request), timeout_idle(timeout_idle) {}
+                timeout_request(timeout_request), timeout_idle(timeout_idle), document_root(document_root) {
+            if (!document_root.empty()) {
+                char buffer[PATH_MAX];
+                char *real_path = realpath(document_root.c_str(), buffer);
+                if (real_path)
+                    this->document_root = real_path;
+                else
+                    this->document_root.clear();
+            }
+        }
         
         virtual void accept()=0;
         
@@ -288,6 +300,44 @@ namespace SimpleWeb {
                     return;
                 }
             }
+
+            // if matched nothing and document_root was setted then try send file
+            if (document_root.empty())
+                return;
+
+            std::string filename = document_root + (connection->path == "/" ? "/index.html" : connection->path);
+            std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
+            std::ostream response(write_buffer.get());
+
+
+            char real_filename_buffer[PATH_MAX];
+            char* res_real_filename = realpath(filename.c_str(), real_filename_buffer);
+
+            std::string real_filename = "";
+            if (res_real_filename)
+                real_filename = real_filename_buffer;
+
+            struct stat st;
+            lstat(real_filename.c_str(), &st);
+
+            std::ifstream ifs;
+            if (res_real_filename && real_filename.find(document_root) == 0 && S_ISREG(st.st_mode))
+                ifs.open(real_filename, std::ifstream::in);
+            else
+                ifs.close();
+
+            if(ifs) {
+                ifs.seekg(0, std::ios::end);
+                size_t length=ifs.tellg();
+                ifs.seekg(0, std::ios::beg);
+                response << "HTTP/1.1 200 OK\r\nContent-Length: " << length << "\r\n\r\n" << ifs.rdbuf();
+                ifs.close();
+            }
+            else {
+                response << "HTTP/1.1 404 Not found\r\nContent-Length: 59\r\n\r\n<!DOCTYPE html><html><body><h1>Not found</h1></body></html>";
+            }
+
+            boost::asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer](const boost::system::error_code& ec, size_t bytes_transferred) {});
         }
         
         bool generate_handshake(std::shared_ptr<Connection> connection, std::ostream& handshake) const {
@@ -506,8 +556,8 @@ namespace SimpleWeb {
     template<>
     class SocketServer<WS> : public SocketServerBase<WS> {
     public:
-        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
-                SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle) {};
+        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0, std::string document_root=std::string()) :
+                SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle, document_root) {};
         
     private:
         void accept() {
