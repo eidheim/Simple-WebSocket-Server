@@ -22,7 +22,7 @@ namespace SimpleWeb {
     class SocketServerBase {
     public:
         class Connection {
-            friend class SocketServerBase<socket_type>;;
+            friend class SocketServerBase<socket_type>;
             friend class SocketServer<socket_type>;
             
         public:
@@ -70,15 +70,17 @@ namespace SimpleWeb {
         };
         
         class Endpoint {
+            friend class SocketServerBase<socket_type>;
+        private:
+            std::set<std::shared_ptr<Connection> > connections;
+            std::mutex connections_mutex;
+
         public:            
             std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
             
-            std::set<std::shared_ptr<Connection> > connections;
-            std::mutex connections_mutex;
-
             std::set<std::shared_ptr<Connection> > get_connections() {
                 connections_mutex.lock();
                 auto copy=connections;
