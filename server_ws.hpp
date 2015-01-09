@@ -93,6 +93,7 @@ namespace SimpleWeb {
             accept();
             
             //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
+            threads.clear();
             for(size_t c=1;c<num_threads;c++) {
                 threads.emplace_back([this](){
                     asio_io_service.run();
