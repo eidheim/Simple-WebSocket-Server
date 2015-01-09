@@ -69,14 +69,25 @@ namespace SimpleWeb {
             boost::asio::streambuf data_buffer;
         };
         
-        struct Callbacks {
+        class Endpoint {
+        public:            
             std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
+            
+            std::set<std::shared_ptr<Connection> > connections;
+            std::mutex connections_mutex;
+
+            std::set<std::shared_ptr<Connection> > get_connections() {
+                connections_mutex.lock();
+                auto copy=connections;
+                connections_mutex.unlock();
+                return copy;
+            }
         };
         
-        std::map<std::string, Callbacks> endpoint;        
+        std::map<std::string, Endpoint> endpoint;        
         
         void start() {
             accept();
@@ -99,6 +110,10 @@ namespace SimpleWeb {
         
         void stop() {
             asio_io_service.stop();
+            
+            connections.clear();
+            for(auto& p: endpoint)
+                p.second.connections.clear();
         }
         
         //fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection
@@ -306,9 +321,9 @@ namespace SimpleWeb {
         }
         
         void read_message(std::shared_ptr<Connection> connection, 
-                std::shared_ptr<boost::asio::streambuf> read_buffer, Callbacks& callbacks) {
+                std::shared_ptr<boost::asio::streambuf> read_buffer, Endpoint& endpoint) {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
-                    [this, connection, read_buffer, &callbacks]
+                    [this, connection, read_buffer, &endpoint]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
                     std::istream stream(read_buffer.get());
@@ -323,7 +338,7 @@ namespace SimpleWeb {
                     if(first_bytes[1]<128) {
                         const std::string reason="message from client not masked";
                         send_close(connection, 1002, reason);
-                        connection_close(connection, callbacks, 1002, reason);
+                        connection_close(connection, endpoint, 1002, reason);
                         return;
                     }
                     
@@ -332,7 +347,7 @@ namespace SimpleWeb {
                     if(length==126) {
                         //2 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
-                                [this, connection, read_buffer, &callbacks, fin_rsv_opcode]
+                                [this, connection, read_buffer, &endpoint, fin_rsv_opcode]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
@@ -346,16 +361,16 @@ namespace SimpleWeb {
                                 for(int c=0;c<num_bytes;c++)
                                     length+=length_bytes[c]<<(8*(num_bytes-1-c));
                                 
-                                read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
+                                read_message_content(connection, read_buffer, length, endpoint, fin_rsv_opcode);
                             }
                             else
-                                connection_error(connection, callbacks, ec);
+                                connection_error(connection, endpoint, ec);
                         });
                     }
                     else if(length==127) {
                         //8 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(8),
-                                [this, connection, read_buffer, &callbacks, fin_rsv_opcode]
+                                [this, connection, read_buffer, &endpoint, fin_rsv_opcode]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
@@ -369,25 +384,25 @@ namespace SimpleWeb {
                                 for(int c=0;c<num_bytes;c++)
                                     length+=length_bytes[c]<<(8*(num_bytes-1-c));
 
-                                read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
+                                read_message_content(connection, read_buffer, length, endpoint, fin_rsv_opcode);
                             }
                             else
-                                connection_error(connection, callbacks, ec);
+                                connection_error(connection, endpoint, ec);
                         });
                     }
                     else
-                        read_message_content(connection, read_buffer, length, callbacks, fin_rsv_opcode);
+                        read_message_content(connection, read_buffer, length, endpoint, fin_rsv_opcode);
                 }
                 else
-                    connection_error(connection, callbacks, ec);
+                    connection_error(connection, endpoint, ec);
             });
         }
         
         void read_message_content(std::shared_ptr<Connection> connection, 
                 std::shared_ptr<boost::asio::streambuf> read_buffer, 
-                size_t length, Callbacks& callbacks, unsigned char fin_rsv_opcode) {
+                size_t length, Endpoint& endpoint, unsigned char fin_rsv_opcode) {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(4+length),
-                    [this, connection, read_buffer, length, &callbacks, fin_rsv_opcode]
+                    [this, connection, read_buffer, length, &endpoint, fin_rsv_opcode]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
                     std::istream raw_message_data(read_buffer.get());
@@ -420,7 +435,7 @@ namespace SimpleWeb {
                         std::string reason=reason_ss.str();
                         
                         send_close(connection, status, reason);
-                        connection_close(connection, callbacks, status, reason);
+                        connection_close(connection, endpoint, status, reason);
                         return;
                     }
                     //If ping
@@ -429,45 +444,60 @@ namespace SimpleWeb {
                         std::stringstream empty_ss;
                         send(connection, empty_ss, nullptr, fin_rsv_opcode+1);
                     }
-                    else if(callbacks.onmessage) {
+                    else if(endpoint.onmessage) {
                         timer_idle_reset(connection);
-                        callbacks.onmessage(connection, message);
+                        endpoint.onmessage(connection, message);
                     }
 
                     //Next message
-                    read_message(connection, read_buffer, callbacks);
+                    read_message(connection, read_buffer, endpoint);
                 }
                 else
-                    connection_error(connection, callbacks, ec);
+                    connection_error(connection, endpoint, ec);
             });
         }
         
-        void connection_open(std::shared_ptr<Connection> connection, const Callbacks& callbacks) {
+        void connection_open(std::shared_ptr<Connection> connection, Endpoint& endpoint) {
             timer_idle_init(connection);
             connections_mutex.lock();
             connections.insert(connection);
             connections_mutex.unlock();
-            if(callbacks.onopen)
-                callbacks.onopen(connection);
+            
+            endpoint.connections_mutex.lock();
+            endpoint.connections.insert(connection);
+            endpoint.connections_mutex.unlock();
+            
+            if(endpoint.onopen)
+                endpoint.onopen(connection);
         }
         
-        void connection_close(std::shared_ptr<Connection> connection, const Callbacks& callbacks, int status, const std::string& reason) {
+        void connection_close(std::shared_ptr<Connection> connection, Endpoint& endpoint, int status, const std::string& reason) {
             timer_idle_cancel(connection);
             connections_mutex.lock();
             connections.erase(connection);
             connections_mutex.unlock();
-            if(callbacks.onclose)
-                callbacks.onclose(connection, status, reason);
+            
+            endpoint.connections_mutex.lock();
+            endpoint.connections.erase(connection);
+            endpoint.connections_mutex.unlock();    
+            
+            if(endpoint.onclose)
+                endpoint.onclose(connection, status, reason);
         }
         
-        void connection_error(std::shared_ptr<Connection> connection, const Callbacks& callbacks, const boost::system::error_code& ec) {
+        void connection_error(std::shared_ptr<Connection> connection, Endpoint& endpoint, const boost::system::error_code& ec) {
             timer_idle_cancel(connection);
             connections_mutex.lock();
             connections.erase(connection);
             connections_mutex.unlock();
-            if(callbacks.onerror) {
+            
+            endpoint.connections_mutex.lock();
+            endpoint.connections.erase(connection);
+            endpoint.connections_mutex.unlock();
+            
+            if(endpoint.onerror) {
                 boost::system::error_code ec_tmp=ec;
-                callbacks.onerror(connection, ec_tmp);
+                endpoint.onerror(connection, ec_tmp);
             }
         }
         
