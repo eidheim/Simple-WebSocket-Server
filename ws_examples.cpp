@@ -65,6 +65,7 @@ int main() {
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
         
+        //echo_all.get_connections() can also be used to solely receive connections on this endpoint
         for(auto a_connection: server.get_connections()) {
             stringstream response_ss;
             response_ss << data_ss.str();

@@ -112,7 +112,6 @@ namespace SimpleWeb {
         void stop() {
             asio_io_service.stop();
             
-            connections.clear();
             for(auto& p: endpoint)
                 p.second.connections.clear();
         }
@@ -182,18 +181,18 @@ namespace SimpleWeb {
         }
         
         std::set<std::shared_ptr<Connection> > get_connections() {
-            connections_mutex.lock();
-            auto copy=connections;
-            connections_mutex.unlock();
-            return copy;
+            std::set<std::shared_ptr<Connection> > all_connections;
+            for(auto& e: endpoint) {
+                e.second.connections_mutex.lock();
+                all_connections.insert(e.second.connections.begin(), e.second.connections.end());
+                e.second.connections_mutex.unlock();
+            }
+            return all_connections;
         }
         
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-        
-        std::set<std::shared_ptr<Connection> > connections;
-        std::mutex connections_mutex;
-        
+                
         boost::asio::io_service asio_io_service;
         boost::asio::ip::tcp::endpoint asio_endpoint;
         boost::asio::ip::tcp::acceptor asio_acceptor;
@@ -460,9 +459,6 @@ namespace SimpleWeb {
         
         void connection_open(std::shared_ptr<Connection> connection, Endpoint& endpoint) {
             timer_idle_init(connection);
-            connections_mutex.lock();
-            connections.insert(connection);
-            connections_mutex.unlock();
             
             endpoint.connections_mutex.lock();
             endpoint.connections.insert(connection);
@@ -474,9 +470,6 @@ namespace SimpleWeb {
         
         void connection_close(std::shared_ptr<Connection> connection, Endpoint& endpoint, int status, const std::string& reason) {
             timer_idle_cancel(connection);
-            connections_mutex.lock();
-            connections.erase(connection);
-            connections_mutex.unlock();
             
             endpoint.connections_mutex.lock();
             endpoint.connections.erase(connection);
@@ -488,9 +481,6 @@ namespace SimpleWeb {
         
         void connection_error(std::shared_ptr<Connection> connection, Endpoint& endpoint, const boost::system::error_code& ec) {
             timer_idle_cancel(connection);
-            connections_mutex.lock();
-            connections.erase(connection);
-            connections_mutex.unlock();
             
             endpoint.connections_mutex.lock();
             endpoint.connections.erase(connection);
