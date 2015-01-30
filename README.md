@@ -36,7 +36,12 @@ On Linux using g++: add `-pthread`
 
 #### WS
 
-Use CMake and make, or:
+```
+cmake .
+make
+```
+
+or
 
 `g++ -O3 -std=c++1y ws_examples.cpp -lboost_system -lcrypto -o ws_examples`
 
@@ -44,7 +49,12 @@ Then to run the server and client examples: `./ws_examples`
 
 #### WSS
 
-Use CMake and make, or:
+```
+cmake .
+make
+```
+
+or
 
 `g++ -O3 -std=c++1y wss_examples.cpp -lboost_system -lssl -lcrypto -o wss_examples`
 
