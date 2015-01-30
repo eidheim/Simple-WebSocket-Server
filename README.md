@@ -32,29 +32,22 @@ ws_examples.cpp and wss_examples.cpp use C++14 features.
 
 Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
-On Linux using g++: add `-pthread`
-
-#### WS
-
 ```
 cmake .
 make
 ```
 
 or
+
+On Linux using g++: add `-pthread`
+
+#### WS
 
 `g++ -O3 -std=c++1y ws_examples.cpp -lboost_system -lcrypto -o ws_examples`
 
 Then to run the server and client examples: `./ws_examples`
 
 #### WSS
-
-```
-cmake .
-make
-```
-
-or
 
 `g++ -O3 -std=c++1y wss_examples.cpp -lboost_system -lssl -lcrypto -o wss_examples`
 
