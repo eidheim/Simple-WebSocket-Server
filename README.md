@@ -32,18 +32,22 @@ ws_examples.cpp and wss_examples.cpp use C++14 features.
 
 Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
-On Linux using g++: add -pthread
+On Linux using g++: add `-pthread`
 
 #### WS
 
-g++ -O3 -std=c++1y ws_examples.cpp -lboost_system -lcrypto -o ws_examples
+Use CMake and make, or:
 
-Then to run the server and client examples: ./ws_examples
+`g++ -O3 -std=c++1y ws_examples.cpp -lboost_system -lcrypto -o ws_examples`
+
+Then to run the server and client examples: `./ws_examples`
 
 #### WSS
 
-g++ -O3 -std=c++1y wss_examples.cpp -lboost_system -lssl -lcrypto -o wss_examples
+Use CMake and make, or:
+
+`g++ -O3 -std=c++1y wss_examples.cpp -lboost_system -lssl -lcrypto -o wss_examples`
 
 Before running, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
-Then to run the server and client examples: ./wss_examples
+Then to run the server and client examples: `./wss_examples`
