@@ -32,14 +32,14 @@ ws_examples.cpp and wss_examples.cpp use C++14 features.
 
 Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
 
+On Linux using g++: add `-pthread`
+
+You can now also compile using CMake and make:
+
 ```
 cmake .
 make
 ```
-
-or
-
-On Linux using g++: add `-pthread`
 
 #### WS
 
