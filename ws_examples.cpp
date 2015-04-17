@@ -4,6 +4,12 @@
 using namespace std;
 using namespace SimpleWeb;
 
+using ServerConnection = shared_ptr<SocketServer<WS>::Connection>;
+using ServerMessage = shared_ptr<SocketServer<WS>::Message>;
+
+using ClientConnection = shared_ptr<SocketClient<WS>::Connection>;
+using ClientMessage = shared_ptr<SocketClient<WS>::Message>;
+
 int main() {
     //WebSocket (WS)-server at port 8080 using 4 threads
     SocketServer<WS> server(8080, 4);
@@ -15,10 +21,10 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo=server.endpoint["^/echo/?$"];
-    
+
     //C++14, lambda parameters declared with auto
     //For C++11 use: (shared_ptr<Server<WS>::Connection> connection, shared_ptr<Server<WS>::Message> message)
-    echo.onmessage=[&server](auto connection, auto message) {
+    echo.onmessage=[&server](ServerConnection connection, ServerMessage message) {
         //To receive message from client as string (data_ss.str())
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
@@ -37,17 +43,17 @@ int main() {
         });        
     };
     
-    echo.onopen=[](auto connection) {
+    echo.onopen=[](ServerConnection connection) {
         cout << "Server: Opened connection " << (size_t)connection.get() << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
-    echo.onclose=[](auto connection, int status, const string& reason) {
+    echo.onclose=[](ServerConnection connection, int status, const string& reason) {
         cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    echo.onerror=[](auto connection, const boost::system::error_code& ec) {
+    echo.onerror=[](ServerConnection connection, const boost::system::error_code& ec) {
         cout << "Server: Error in connection " << (size_t)connection.get() << ". " << 
                 "Error: " << ec << ", error message: " << ec.message() << endl;
     };
@@ -60,7 +66,7 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](auto connection, auto message) {
+    echo_all.onmessage=[&server](ServerConnection connection, ServerMessage message) {
         //To receive message from client as string (data_ss.str())
         stringstream data_ss;
         message->data >> data_ss.rdbuf();
@@ -95,7 +101,7 @@ int main() {
     //Server: Closed connection 140184920260656 with status code 1000
     //Client: Closed connection with status code 1000
     SocketClient<WS> client("localhost:8080/echo");
-    client.onmessage=[&client](auto message) {    
+    client.onmessage=[&client](ClientMessage message) {
         stringstream data_ss;
         data_ss << message->data.rdbuf();
         cout << "Client: Message received: \"" << data_ss.str() << "\"" << endl;

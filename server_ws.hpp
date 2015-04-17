@@ -4,8 +4,8 @@
 #include "crypto.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/regex.hpp>
 
-#include <regex>
 #include <unordered_map>
 #include <thread>
 #include <mutex>
@@ -30,7 +30,7 @@ namespace SimpleWeb {
 
             std::unordered_map<std::string, std::string> header;
 
-            std::smatch path_match;
+            boost::match_results<std::string::const_iterator> path_match;
             
             boost::asio::ip::address remote_endpoint_address;
             unsigned short remote_endpoint_port;
@@ -251,15 +251,15 @@ namespace SimpleWeb {
         }
         
         void parse_handshake(std::shared_ptr<Connection> connection, std::istream& stream) const {
-            std::regex e("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
+            boost::regex e("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
 
-            std::smatch sm;
+            boost::match_results <std::string::const_iterator> sm;
 
             //First parse request method, path, and HTTP-version from the first line
             std::string line;
             getline(stream, line);
             line.pop_back();
-            if(std::regex_match(line, sm, e)) {        
+            if(boost::regex_match(line, sm, e)) {
                 connection->method=sm[1];
                 connection->path=sm[2];
                 connection->http_version=sm[3];
@@ -270,7 +270,7 @@ namespace SimpleWeb {
                 do {
                     getline(stream, line);
                     line.pop_back();
-                    matched=std::regex_match(line, sm, e);
+                    matched=boost::regex_match(line, sm, e);
                     if(matched) {
                         connection->header[sm[1]]=sm[2];
                     }
@@ -282,9 +282,10 @@ namespace SimpleWeb {
         void write_handshake(std::shared_ptr<Connection> connection, std::shared_ptr<boost::asio::streambuf> read_buffer) {
             //Find path- and method-match, and generate response
             for(auto& an_endpoint: endpoint) {
-                std::regex e(an_endpoint.first);
-                std::smatch path_match;
-                if(std::regex_match(connection->path, path_match, e)) {
+                boost::regex e(an_endpoint.first);
+                boost::match_results<std::string::const_iterator> path_match;
+
+                if(boost::regex_match(connection->path, path_match, e)) {
                     std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
                     std::ostream handshake(write_buffer.get());
 
