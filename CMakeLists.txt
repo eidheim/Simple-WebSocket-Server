@@ -1,10 +1,10 @@
 cmake_minimum_required (VERSION 2.8)
 project (Simple-WebSocket-Server)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O3")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
-        message(FATAL_ERROR "GCC version >=4.9 required.")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+        message(FATAL_ERROR "GCC version >=4.8 required.")
     endif()
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.4)
@@ -15,7 +15,7 @@ else()
 endif()
 
 #Only tested with versions 1.55 and 1.56
-find_package(Boost 1.41.0 COMPONENTS system REQUIRED)
+find_package(Boost 1.41.0 COMPONENTS system regex REQUIRED)
 message("Boost include dir: ${Boost_INCLUDE_DIR}")
 message("Boost libraries: ${Boost_LIBRARIES}")
 include_directories(${Boost_INCLUDE_DIR})
