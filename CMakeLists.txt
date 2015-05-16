@@ -42,6 +42,4 @@ target_link_libraries(ws_examples ${OPENSSL_CRYPTO_LIBRARIES})
 target_link_libraries(ws_examples ${CMAKE_THREAD_LIBS_INIT})
 
 enable_testing()
-add_executable(crypto_test crypto_test.cpp)
-target_link_libraries(crypto_test ${OPENSSL_CRYPTO_LIBRARIES})
-add_test(crypto_test crypto_test)
+add_subdirectory(test)
