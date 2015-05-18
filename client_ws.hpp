@@ -7,7 +7,6 @@
 
 #include <unordered_map>
 #include <iostream>
-#include <regex>
 #include <random>
 
 namespace SimpleWeb {
@@ -159,21 +158,28 @@ namespace SimpleWeb {
                 
         SocketClientBase(const std::string& host_port_path, unsigned short default_port) : 
                 asio_resolver(asio_io_service) {
-            std::regex e("^([^:/]+):?([0-9]*)(.*)$");
-
-            std::smatch sm;
-
-            if(std::regex_match(host_port_path, sm, e)) {
-                host=sm[1];
-                path=sm[3];
+            size_t host_end=host_port_path.find(':');
+            size_t host_port_end=host_port_path.find('/');
+            if(host_end==std::string::npos) {
+                host_end=host_port_end;
                 port=default_port;
-                if(sm[2]!="")
-                    port=(unsigned short)std::stoul(sm[2]);
-                asio_endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port);
             }
             else {
-                throw std::invalid_argument("Error parsing host_port_path");
+                if(host_port_end==std::string::npos)
+                    port=(unsigned short)stoul(host_port_path.substr(host_end+1));
+                else
+                    port=(unsigned short)stoul(host_port_path.substr(host_end+1, host_port_end-(host_end+1)));
             }
+            if(host_port_end==std::string::npos) {
+                path="/";
+            }
+            else {
+                path=host_port_path.substr(host_port_end);
+            }
+            if(host_end==std::string::npos)
+                host=host_port_path;
+            else
+                host=host_port_path.substr(0, host_end);
         }
         
         virtual void connect()=0;
@@ -233,25 +239,22 @@ namespace SimpleWeb {
         }
         
         void parse_handshake(std::istream& stream) const {
-            std::smatch sm;
-
-            //Not parsing the first line
             std::string line;
             getline(stream, line);
-            line.pop_back();
+            //Not parsing the first line
+            
+            getline(stream, line);
+            size_t param_end=line.find(':');
+            while(param_end!=std::string::npos) {                
+                size_t value_start=param_end+1;
+                if(line[value_start]==' ')
+                    value_start++;
 
-            bool matched;
-            std::regex e("^([^:]*): ?(.*)$");
-            //Parse the rest of the header
-            do {
+                connection->header[line.substr(0, param_end)]=line.substr(value_start, line.size()-value_start-1);
+
                 getline(stream, line);
-                line.pop_back();
-                matched=std::regex_match(line, sm, e);
-                if(matched) {
-                    connection->header[sm[1]]=sm[2];
-                }
-
-            } while(matched==true);
+                param_end=line.find(':');
+            }
         }
         
         void read_message(std::shared_ptr<Message> message) {

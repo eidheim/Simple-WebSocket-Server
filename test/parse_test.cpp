@@ -1,7 +1,7 @@
 #define private public
 
-#include "../server_ws.hpp"
-#include "../client_ws.hpp"
+#include "server_ws.hpp"
+#include "client_ws.hpp"
 #include <iostream>
 
 using namespace std;
@@ -55,6 +55,8 @@ public:
     void connect() {}
     
     bool constructor_parse_test1() {
+        if(path!="/test")
+            return 0;
         if(host!="test.org")
             return 0;
         if(port!=8080)
@@ -64,9 +66,33 @@ public:
     }
     
     bool constructor_parse_test2() {
+        if(path!="/test")
+            return 0;
         if(host!="test.org")
             return 0;
         if(port!=80)
+            return 0;
+        
+        return 1;
+    }
+    
+    bool constructor_parse_test3() {
+        if(path!="/")
+            return 0;
+        if(host!="test.org")
+            return 0;
+        if(port!=80)
+            return 0;
+        
+        return 1;
+    }
+    
+    bool constructor_parse_test4() {
+        if(path!="/")
+            return 0;
+        if(host!="test.org")
+            return 0;
+        if(port!=8080)
             return 0;
         
         return 1;
@@ -107,19 +133,31 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    SocketClientTest clientTest("test.org:8080");
+    SocketClientTest clientTest("test.org:8080/test");
     if(!clientTest.constructor_parse_test1()) {
         cerr << "FAIL SocketClient::SocketClient" << endl;
         return 1;
     }
     
-    SocketClientTest clientTest2("test.org");
+    SocketClientTest clientTest2("test.org/test");
     if(!clientTest2.constructor_parse_test2()) {
         cerr << "FAIL SocketClient::SocketClient" << endl;
         return 1;
     }
     
-    if(!clientTest2.parse_response_header_test()) {
+    SocketClientTest clientTest3("test.org");
+    if(!clientTest3.constructor_parse_test3()) {
+        cerr << "FAIL SocketClient::SocketClient" << endl;
+        return 1;
+    }
+    
+    SocketClientTest clientTest4("test.org:8080");
+    if(!clientTest4.constructor_parse_test4()) {
+        cerr << "FAIL SocketClient::SocketClient" << endl;
+        return 1;
+    }
+    
+    if(!clientTest4.parse_response_header_test()) {
         cerr << "FAIL SocketClient::parse_response_header" << endl;
         return 1;
     }

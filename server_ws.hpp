@@ -89,9 +89,18 @@ namespace SimpleWeb {
             }
         };
         
-        std::map<std::string, Endpoint> endpoint;        
+        std::map<std::string, Endpoint> endpoint;
         
+    private:
+        std::vector<std::pair<std::regex, Endpoint*> > opt_endpoint;
+        
+    public:
         void start() {
+            opt_endpoint.clear();
+            for(auto& endp: endpoint) {
+                opt_endpoint.emplace_back(std::regex(endp.first), &endp.second);
+            }
+            
             accept();
             
             //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
@@ -251,40 +260,35 @@ namespace SimpleWeb {
         }
         
         void parse_handshake(std::shared_ptr<Connection> connection, std::istream& stream) const {
-            std::regex e("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
-
-            std::smatch sm;
-
-            //First parse request method, path, and HTTP-version from the first line
             std::string line;
             getline(stream, line);
-            line.pop_back();
-            if(std::regex_match(line, sm, e)) {        
-                connection->method=sm[1];
-                connection->path=sm[2];
-                connection->http_version=sm[3];
+            size_t method_end=line.find(' ');
+            size_t path_end=line.find(' ', method_end+1);
+            if(method_end!=std::string::npos && path_end!=std::string::npos) {
+                connection->method=line.substr(0, method_end);
+                connection->path=line.substr(method_end+1, path_end-method_end-1);
+                connection->http_version=line.substr(path_end+6, line.size()-path_end-7);
 
-                bool matched;
-                e="^([^:]*): ?(.*)$";
-                //Parse the rest of the header
-                do {
+                getline(stream, line);
+                size_t param_end=line.find(':');
+                while(param_end!=std::string::npos) {                
+                    size_t value_start=param_end+1;
+                    if(line[value_start]==' ')
+                        value_start++;
+
+                    connection->header[line.substr(0, param_end)]=line.substr(value_start, line.size()-value_start-1);
+
                     getline(stream, line);
-                    line.pop_back();
-                    matched=std::regex_match(line, sm, e);
-                    if(matched) {
-                        connection->header[sm[1]]=sm[2];
-                    }
-
-                } while(matched==true);
+                    param_end=line.find(':');
+                }
             }
         }
         
         void write_handshake(std::shared_ptr<Connection> connection, std::shared_ptr<boost::asio::streambuf> read_buffer) {
             //Find path- and method-match, and generate response
-            for(auto& an_endpoint: endpoint) {
-                std::regex e(an_endpoint.first);
+            for(auto& endp: opt_endpoint) {
                 std::smatch path_match;
-                if(std::regex_match(connection->path, path_match, e)) {
+                if(std::regex_match(connection->path, path_match, endp.first)) {
                     std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
                     std::ostream handshake(write_buffer.get());
 
@@ -292,14 +296,14 @@ namespace SimpleWeb {
                         connection->path_match=std::move(path_match);
                         //Capture write_buffer in lambda so it is not destroyed before async_write is finished
                         boost::asio::async_write(*connection->socket, *write_buffer, 
-                                [this, connection, write_buffer, read_buffer, &an_endpoint]
+                                [this, connection, write_buffer, read_buffer, &endp]
                                 (const boost::system::error_code& ec, size_t bytes_transferred) {
                             if(!ec) {
-                                connection_open(connection, an_endpoint.second);
-                                read_message(connection, read_buffer, an_endpoint.second);
+                                connection_open(connection, *endp.second);
+                                read_message(connection, read_buffer, *endp.second);
                             }
                             else
-                                connection_error(connection, an_endpoint.second, ec);
+                                connection_error(connection, *endp.second, ec);
                         });
                     }
                     return;

@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 project (Simple-WebSocket-Server)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -O3 -Wno-deprecated-declarations")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
@@ -29,6 +29,8 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 
 find_package(Threads REQUIRED)
 message("Threads libraries/flag: ${CMAKE_THREAD_LIBS_INIT}")
+
+include_directories(.)
 
 add_executable(wss_examples wss_examples.cpp)
 target_link_libraries(wss_examples ${Boost_LIBRARIES})

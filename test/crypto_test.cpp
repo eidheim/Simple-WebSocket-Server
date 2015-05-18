@@ -4,7 +4,7 @@
 #include <utility>
 #include <iomanip>
 
-#include "../crypto.hpp"
+#include "crypto.hpp"
 
 using namespace std;
 using namespace SimpleWeb;
