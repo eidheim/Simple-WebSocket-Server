@@ -22,7 +22,7 @@ namespace SimpleWeb {
 
         public:
             std::unordered_map<std::string, std::string> header;
-            boost::asio::ip::address remote_endpoint_address;
+            std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
             Connection(socket_type* socket): socket(socket), closed(false) {}
@@ -33,7 +33,7 @@ namespace SimpleWeb {
             
             void read_remote_endpoint_data() {
                 try {
-                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address();
+                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address().to_string();
                     remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
                 }
                 catch(const std::exception& e) {

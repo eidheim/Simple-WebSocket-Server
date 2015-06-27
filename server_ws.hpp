@@ -32,7 +32,7 @@ namespace SimpleWeb {
 
             std::smatch path_match;
             
-            boost::asio::ip::address remote_endpoint_address;
+            std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
         private:
@@ -47,7 +47,7 @@ namespace SimpleWeb {
             
             void read_remote_endpoint_data() {
                 try {
-                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address();
+                    remote_endpoint_address=socket->lowest_layer().remote_endpoint().address().to_string();
                     remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
                 }
                 catch(const std::exception& e) {
