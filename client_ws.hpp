@@ -90,7 +90,7 @@ namespace SimpleWeb {
             asio_io_service.stop();
         }
         
-        void send(std::shared_ptr<SendStream> payload_stream, const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
+        void send(std::shared_ptr<SendStream> send_stream, const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
                         unsigned char fin_rsv_opcode=129) {
             //Create mask
             std::vector<unsigned char> mask;
@@ -101,42 +101,42 @@ namespace SimpleWeb {
                 mask[c]=dist(rd);
             }
 
-            std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
-            std::ostream response(write_buffer.get());
+            std::shared_ptr<boost::asio::streambuf> buffer(new boost::asio::streambuf);
+            std::ostream stream(buffer.get());
             
-            size_t length=payload_stream->size();
+            size_t length=send_stream->size();
             
-            response.put(fin_rsv_opcode);
+            stream.put(fin_rsv_opcode);
             //masked (first length byte>=128)
             if(length>=126) {
                 int num_bytes;
                 if(length>0xffff) {
                     num_bytes=8;
-                    response.put(127+128);
+                    stream.put(127+128);
                 }
                 else {
                     num_bytes=2;
-                    response.put(126+128);
+                    stream.put(126+128);
                 }
                 
                 for(int c=num_bytes-1;c>=0;c--) {
-                    response.put((length>>(8*c))%256);
+                    stream.put((length>>(8*c))%256);
                 }
             }
             else
-                response.put(length+128);
+                stream.put(length+128);
             
             for(int c=0;c<4;c++) {
-                response.put(mask[c]);
+                stream.put(mask[c]);
             }
             
             for(size_t c=0;c<length;c++) {
-                response.put(payload_stream->get()^mask[c%4]);
+                stream.put(send_stream->get()^mask[c%4]);
             }
             
             //Need to copy the callback-function in case its destroyed
-            boost::asio::async_write(*connection->socket, *write_buffer, 
-                    [this, write_buffer, callback](const boost::system::error_code& ec, size_t bytes_transferred) {
+            boost::asio::async_write(*connection->socket, *buffer, 
+                    [this, buffer, callback](const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(callback) {
                     callback(ec);
                 }

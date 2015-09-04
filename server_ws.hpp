@@ -147,57 +147,49 @@ namespace SimpleWeb {
         
         //fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection
         //See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-        void send(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> payload_stream, 
+        void send(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> send_stream, 
                 const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
                 unsigned char fin_rsv_opcode=129) const {
             if(fin_rsv_opcode!=136)
                 timer_idle_reset(connection);
             
-            std::shared_ptr<boost::asio::streambuf> header_buffer(new boost::asio::streambuf);
-            std::ostream header_stream(header_buffer.get());
+            std::shared_ptr<boost::asio::streambuf> buffer(new boost::asio::streambuf());
+            std::ostream stream(buffer.get());
 
-            size_t length=payload_stream->size();
+            size_t length=send_stream->size();
 
-            header_stream.put(fin_rsv_opcode);
+            stream.put(fin_rsv_opcode);
             //unmasked (first length byte<128)
             if(length>=126) {
                 int num_bytes;
                 if(length>0xffff) {
                     num_bytes=8;
-                    header_stream.put(127);
+                    stream.put(127);
                 }
                 else {
                     num_bytes=2;
-                    header_stream.put(126);
+                    stream.put(126);
                 }
                 
                 for(int c=num_bytes-1;c>=0;c--) {
-                    header_stream.put((length>>(8*c))%256);
+                    stream.put((length>>(8*c))%256);
                 }
             }
             else
-                header_stream.put(length);
+                stream.put(length);
 
+            //Tried unsuccessfully to send header and message separately
+            stream << send_stream->rdbuf(); //Hopefully this is more effective when using two boost::asio::streambuf stream buffers
+            
+            if(send_stream->sending==true)
+                throw std::runtime_error("SendStream already in use! Only reuse a SendStream if you are sure a prior send operation using the stream is finished.");
+            send_stream->sending=true;
             //Need to copy the callback-function in case its destroyed
-            boost::asio::async_write(*connection->socket, *header_buffer, 
-                    [this, connection, header_buffer, payload_stream, callback]
+            boost::asio::async_write(*connection->socket, *buffer, 
+                    [this, connection, buffer, send_stream, callback]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
-                if(!ec) {
-                    if(payload_stream->sending==true)
-                        throw std::runtime_error("SendStream already in use! Only reuse a SendStream if you are sure a prior send operation using the stream is finished.");
-                    payload_stream->sending=true;
-                    boost::asio::async_write(*connection->socket, payload_stream->streambuf, 
-                            [this, connection, payload_stream, callback]
-                            (const boost::system::error_code& ec, size_t bytes_transferred) {
-                        payload_stream->sending=false;
-                        if(callback) {
-                            callback(ec);
-                        }
-                    });
-                }
-                else {
-                    callback(ec);
-                }
+                send_stream->sending=false;
+                callback(ec);
             });
         }
         
