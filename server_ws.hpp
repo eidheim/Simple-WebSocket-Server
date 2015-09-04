@@ -40,11 +40,13 @@ namespace SimpleWeb {
             //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
             std::unique_ptr<socket_type> socket;
             
+            boost::asio::strand strand;
+            
             std::atomic<bool> closed;
 
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
 
-            Connection(socket_type* socket_ptr): socket(socket_ptr), closed(false) {}
+            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
             
             void read_remote_endpoint_data() {
                 try {
@@ -179,7 +181,7 @@ namespace SimpleWeb {
             else
                 stream.put(length);
 
-            boost::asio::spawn(asio_strand, [this, connection, buffer, send_stream, callback](boost::asio::yield_context yield) {
+            boost::asio::spawn(connection->strand, [this, connection, buffer, send_stream, callback](boost::asio::yield_context yield) {
                 //Need to copy the callback-function in case its destroyed
                 boost::system::error_code ec;
                 boost::asio::async_write(*connection->socket, *buffer, yield[ec]);
@@ -234,7 +236,7 @@ namespace SimpleWeb {
         boost::asio::io_service asio_io_service;
         boost::asio::ip::tcp::endpoint asio_endpoint;
         boost::asio::ip::tcp::acceptor asio_acceptor;
-        boost::asio::strand asio_strand;
+        
         size_t num_threads;
         std::vector<std::thread> threads;
         
@@ -242,7 +244,7 @@ namespace SimpleWeb {
         size_t timeout_idle;
         
         SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
-                asio_endpoint(boost::asio::ip::tcp::v4(), port), asio_acceptor(asio_io_service, asio_endpoint), asio_strand(asio_io_service),
+                asio_endpoint(boost::asio::ip::tcp::v4(), port), asio_acceptor(asio_io_service, asio_endpoint),
                 num_threads(num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle) {}
         
         virtual void accept()=0;
