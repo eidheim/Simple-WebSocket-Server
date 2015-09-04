@@ -5,6 +5,9 @@ A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebS
 
 See also https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. 
 
+### Backward compatibility note
+**Current master branch is not backward compatible with prior versions. Prior versions had problems with moving buffer pointers when sending large and complex streams.**
+
 ### Features
 
 * RFC 6455 mostly supported: text/binary frames, ping-pong, connection close with status and reason.
@@ -15,6 +18,9 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 * Simple way to add WebSocket endpoints using regex for path, and anonymous functions
 * An easy to use WebSocket and WebSocket Secure client library
 * C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypto.hpp)
+
+### TODO
+* Data from client is currently moved to a separate stream while doing masking. This should happen in the stream instead using a custom stream buffer.
 
 ###Usage
 

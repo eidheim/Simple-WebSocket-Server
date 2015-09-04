@@ -19,22 +19,26 @@ int main() {
     auto& echo=server.endpoint["^/echo/?$"];
     
     echo.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
-        //To receive message from client as string (data_ss.str())
-        stringstream data_ss;
-        message->data >> data_ss.rdbuf();
+        auto message_str=message->string();
+        //WsServer::Message::string() is a convenience function for:
+        //stringstream data_ss;
+        //data_ss << message->rdbuf();
+        //auto message_str = data_ss.str();
         
-        cout << "Server: Message received: \"" << data_ss.str() << "\" from " << (size_t)connection.get() << endl;
+        cout << "Server: Message received: \"" << message_str << "\" from " << (size_t)connection.get() << endl;
                 
-        cout << "Server: Sending message \"" << data_ss.str() <<  "\" to " << (size_t)connection.get() << endl;
+        cout << "Server: Sending message \"" << message_str <<  "\" to " << (size_t)connection.get() << endl;
         
+        auto send_stream=make_shared<WsServer::SendStream>();
+        *send_stream << message_str;
         //server.send is an asynchronous function
-        server.send(connection, data_ss, [](const boost::system::error_code& ec){
+        server.send(connection, send_stream, [](const boost::system::error_code& ec){
             if(ec) {
                 cout << "Server: Error sending message. " <<
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
                         "Error: " << ec << ", error message: " << ec.message() << endl;
            }
-        });        
+        });
     };
     
     echo.onopen=[](shared_ptr<WsServer::Connection> connection) {
@@ -62,16 +66,19 @@ int main() {
     auto& echo_all=server.endpoint["^/echo_all/?$"];
     echo_all.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
         //To receive message from client as string (data_ss.str())
-        stringstream data_ss;
-        message->data >> data_ss.rdbuf();
+        auto message_str=message->string();
+        //WsServer::Message::string() is a convenience function for:
+        //stringstream data_ss;
+        //data_ss << message->rdbuf();
+        //auto message_str = data_ss.str();
         
         //echo_all.get_connections() can also be used to solely receive connections on this endpoint
         for(auto a_connection: server.get_connections()) {
-            stringstream response_ss;
-            response_ss << data_ss.str();
+            auto send_stream=make_shared<WsServer::SendStream>();
+            *send_stream << message_str;
             
             //server.send is an asynchronous function
-            server.send(a_connection, response_ss);
+            server.send(a_connection, send_stream);
         }
     };
     
@@ -96,9 +103,9 @@ int main() {
     //Client: Closed connection with status code 1000
     WsClient client("localhost:8080/echo");
     client.onmessage=[&client](shared_ptr<WsClient::Message> message) {
-        stringstream data_ss;
-        data_ss << message->data.rdbuf();
-        cout << "Client: Message received: \"" << data_ss.str() << "\"" << endl;
+        auto message_str=message->string();
+        
+        cout << "Client: Message received: \"" << message_str << "\"" << endl;
         
         cout << "Client: Sending close connection" << endl;
         client.send_close(1000);
@@ -107,10 +114,12 @@ int main() {
     client.onopen=[&client]() {
         cout << "Client: Opened connection" << endl;
         
-        stringstream ss;
-        ss << "Hello";
-        cout << "Client: Sending message: \"" << ss.str() << "\"" << endl;
-        client.send(ss);
+        string message="Hello";
+        cout << "Client: Sending message: \"" << message << "\"" << endl;
+
+        auto send_stream=make_shared<WsClient::SendStream>();
+        *send_stream << message;
+        client.send(send_stream);
     };
     
     client.onclose=[](int status, const string& reason) {
