@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 2.8)
 project (Simple-WebSocket-Server)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3 -Wno-deprecated-declarations")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3 -Wall")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
@@ -19,6 +19,10 @@ find_package(Boost 1.41.0 COMPONENTS system REQUIRED)
 message("Boost include dir: ${Boost_INCLUDE_DIR}")
 message("Boost libraries: ${Boost_LIBRARIES}")
 include_directories(${Boost_INCLUDE_DIR})
+
+if(APPLE)
+  set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+endif()
 
 #TODO: add requirement for version 1.0.1g (can it be done in one line?)
 find_package(OpenSSL REQUIRED)
