@@ -34,9 +34,7 @@ OpenSSL libraries from https://www.openssl.org are required.
 
 ### Compile and run
 
-ws_examples.cpp and wss_examples.cpp use C++14 features.
-
-Compile with a C++14 compiler supporting regex (for instance g++ 4.9):
+Compile with a C++11 compiler supporting regex (for instance g++ 4.9):
 
 On Linux using g++: add `-pthread`
 
