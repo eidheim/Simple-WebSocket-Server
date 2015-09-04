@@ -66,10 +66,10 @@ namespace SimpleWeb {
         class SendStream : public std::iostream {
             friend class SocketClientBase<socket_type>;
         private:
-            bool sending=false; //Currently not in use, but might be in a future version
             boost::asio::streambuf streambuf;
+            std::atomic<bool> sending; //Currently not in use, but might be in a future version
         public:
-            SendStream(): std::iostream(&streambuf) {}
+            SendStream(): std::iostream(&streambuf), sending(false) {}
             size_t size() {
                 return streambuf.size();
             }

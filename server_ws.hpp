@@ -4,6 +4,7 @@
 #include "crypto.hpp"
 
 #include <boost/asio.hpp>
+#include <boost/asio/spawn.hpp>
 
 #include <regex>
 #include <unordered_map>
@@ -38,12 +39,13 @@ namespace SimpleWeb {
         private:
             //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
             std::unique_ptr<socket_type> socket;
+            boost::asio::strand strand;
             
             std::atomic<bool> closed;
 
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
 
-            Connection(socket_type* socket_ptr): socket(socket_ptr), closed(false) {}
+            Connection(socket_type* socket_ptr): socket(socket_ptr), strand(socket_ptr->get_io_service()), closed(false) {}
             
             void read_remote_endpoint_data() {
                 try {
@@ -98,10 +100,10 @@ namespace SimpleWeb {
         class SendStream : public std::ostream {
             friend class SocketServerBase<socket_type>;
         private:
-            bool sending=false;
             boost::asio::streambuf streambuf;
+            std::atomic<bool> sending;
         public:
-            SendStream(): std::ostream(&streambuf) {}
+            SendStream(): std::ostream(&streambuf), sending(false) {}
             size_t size() {
                 return streambuf.size();
             }
@@ -178,18 +180,23 @@ namespace SimpleWeb {
             else
                 stream.put(length);
 
-            //Tried unsuccessfully to send header and message separately
-            stream << send_stream->rdbuf(); //Hopefully this is more effective when using two boost::asio::streambuf stream buffers
-            
-            if(send_stream->sending==true)
-                throw std::runtime_error("SendStream already in use! Only reuse a SendStream if you are sure a prior send operation using the stream is finished.");
-            send_stream->sending=true;
-            //Need to copy the callback-function in case its destroyed
-            boost::asio::async_write(*connection->socket, *buffer, 
-                    [this, connection, buffer, send_stream, callback]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+            boost::asio::spawn(connection->strand, [this, connection, buffer, send_stream, callback](boost::asio::yield_context yield) {
+                //Need to copy the callback-function in case its destroyed
+                boost::system::error_code ec;
+                boost::asio::async_write(*connection->socket, *buffer, yield[ec]);
+                if(ec) {
+                    if(callback)
+                        callback(ec);
+                    return;
+                }
+
+                if(send_stream->sending==true)
+                    throw std::runtime_error("SendStream already in use! Only reuse a SendStream if you are sure a prior send operation using the stream is finished.");
+                send_stream->sending=true;
+                boost::asio::async_write(*connection->socket, send_stream->streambuf, yield[ec]);
                 send_stream->sending=false;
-                callback(ec);
+                if(callback)
+                    callback(ec);
             });
         }
         
@@ -462,19 +469,21 @@ namespace SimpleWeb {
                         connection_close(connection, endpoint, status, reason);
                         return;
                     }
-                    //If ping
-                    else if((fin_rsv_opcode&0x0f)==9) {
-                        //send pong
-                        auto empty_send_stream=std::make_shared<SendStream>();
-                        send(connection, empty_send_stream, nullptr, fin_rsv_opcode+1);
+                    else {
+                        //If ping
+                        if((fin_rsv_opcode&0x0f)==9) {
+                            //send pong
+                            auto empty_send_stream=std::make_shared<SendStream>();
+                            send(connection, empty_send_stream, nullptr, fin_rsv_opcode+1);
+                        }
+                        else if(endpoint.onmessage) {
+                            timer_idle_reset(connection);
+                            endpoint.onmessage(connection, message);
+                        }
+    
+                        //Next message
+                        read_message(connection, read_buffer, endpoint);
                     }
-                    else if(endpoint.onmessage) {
-                        timer_idle_reset(connection);
-                        endpoint.onmessage(connection, message);
-                    }
-
-                    //Next message
-                    read_message(connection, read_buffer, endpoint);
                 }
                 else
                     connection_error(connection, endpoint, ec);

@@ -28,33 +28,31 @@ See ws_examples.cpp or wss_examples.cpp for example usage.
 
 ### Dependencies
 
-Boost C++ libraries must be installed, go to http://www.boost.org for download and instructions. 
+* Boost C++ libraries 
+* OpenSSL libraries
 
-OpenSSL libraries from https://www.openssl.org are required. 
-
-### Compile and run
+### Compile
 
 Compile with a C++11 compiler supporting regex (for instance g++ 4.9):
 
-On Linux using g++: add `-pthread`
-
-You can now also compile using CMake and make:
-
-```
+```sh
 cmake .
 make
 ```
 
-#### WS
+#### Run server and client examples
 
-`g++ -O3 -std=c++1y ws_examples.cpp -lboost_system -lcrypto -o ws_examples`
+### WS
 
-Then to run the server and client examples: `./ws_examples`
+```sh
+./ws_examples
+```
 
-#### WSS
+### WSS
 
-`g++ -O3 -std=c++1y wss_examples.cpp -lboost_system -lssl -lcrypto -o wss_examples`
+Before running the WSS-examples, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
 
-Before running, an RSA private key (server.key) and an SSL certificate (server.crt) must be created. Follow, for instance, the instructions given here (for a self-signed certificate): http://www.akadia.com/services/ssh_test_certificate.html
-
-Then to run the server and client examples: `./wss_examples`
+Then:
+```
+./wss_examples
+```
