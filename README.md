@@ -5,9 +5,6 @@ A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebS
 
 See also https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. 
 
-### Backward compatibility note
-**Current master branch is not backward compatible with prior versions. Prior versions had problems with moving buffer pointers when sending large and complex streams.**
-
 ### Features
 
 * RFC 6455 mostly supported: text/binary frames, ping-pong, connection close with status and reason.
