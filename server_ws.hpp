@@ -12,6 +12,7 @@
 #include <mutex>
 #include <set>
 #include <memory>
+#include <atomic>
 
 #include <iostream>
 
