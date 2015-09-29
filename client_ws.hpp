@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <random>
+#include <atomic>
 
 namespace SimpleWeb {
     template <class socket_type>
