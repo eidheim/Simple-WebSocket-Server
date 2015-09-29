@@ -1,5 +1,3 @@
-#define private public
-
 #include "server_ws.hpp"
 #include "client_ws.hpp"
 #include <iostream>
