@@ -119,7 +119,7 @@ public:
         if(connection->header["TestHeader2"]!="test2")
             return 0;
         
-        connection.release();
+        connection.reset();
         return 1;
     }
 };
