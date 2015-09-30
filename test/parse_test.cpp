@@ -119,13 +119,13 @@ public:
         if(connection->header["TestHeader2"]!="test2")
             return 0;
         
+        connection.release();
         return 1;
     }
 };
 
 int main(int argc, char** argv) {
     SocketServerTest serverTest;
-    
     if(!serverTest.parse_request_test()) {
         cerr << "FAIL SocketServer::parse_request" << endl;
         return 1;
