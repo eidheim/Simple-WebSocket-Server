@@ -5,8 +5,8 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
+#include <boost/regex.hpp>
 
-#include <regex>
 #include <unordered_map>
 #include <thread>
 #include <mutex>
@@ -32,7 +32,7 @@ namespace SimpleWeb {
 
             std::unordered_map<std::string, std::string> header;
 
-            std::smatch path_match;
+            boost::smatch path_match;
             
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
@@ -114,13 +114,13 @@ namespace SimpleWeb {
         std::map<std::string, Endpoint> endpoint;
         
     private:
-        std::vector<std::pair<std::regex, Endpoint*> > opt_endpoint;
+        std::vector<std::pair<boost::regex, Endpoint*> > opt_endpoint;
         
     public:
         void start() {
             opt_endpoint.clear();
             for(auto& endp: endpoint) {
-                opt_endpoint.emplace_back(std::regex(endp.first), &endp.second);
+                opt_endpoint.emplace_back(boost::regex(endp.first), &endp.second);
             }
             
             accept();
@@ -318,8 +318,8 @@ namespace SimpleWeb {
         void write_handshake(std::shared_ptr<Connection> connection, std::shared_ptr<boost::asio::streambuf> read_buffer) {
             //Find path- and method-match, and generate response
             for(auto& endp: opt_endpoint) {
-                std::smatch path_match;
-                if(std::regex_match(connection->path, path_match, endp.first)) {
+                boost::smatch path_match;
+                if(boost::regex_match(connection->path, path_match, endp.first)) {
                     std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
                     std::ostream handshake(write_buffer.get());
 
