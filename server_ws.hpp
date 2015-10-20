@@ -180,7 +180,7 @@ namespace SimpleWeb {
                 }
             }
             else
-                stream.put(length);
+                stream.put(static_cast<unsigned char>(length));
 
             boost::asio::spawn(connection->strand, [this, connection, buffer, send_stream, callback](boost::asio::yield_context yield) {
                 //Need to copy the callback-function in case its destroyed
@@ -218,7 +218,7 @@ namespace SimpleWeb {
             *send_stream << reason;
 
             //fin_rsv_opcode=136: message close
-            send(connection, send_stream, [](const boost::system::error_code& ec){}, 136);
+            send(connection, send_stream, [](const boost::system::error_code& /*ec*/){}, 136);
         }
         
         std::set<std::shared_ptr<Connection> > get_connections() {
@@ -252,7 +252,7 @@ namespace SimpleWeb {
         
         std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
             std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(asio_io_service));
-            timer->expires_from_now(boost::posix_time::seconds(seconds));
+            timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
                     connection->socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
@@ -276,7 +276,7 @@ namespace SimpleWeb {
             
             boost::asio::async_read_until(*connection->socket, *read_buffer, "\r\n\r\n",
                     [this, connection, read_buffer, timer]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+                    (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(timeout_request>0)
                     timer->cancel();
                 if(!ec) {
@@ -328,7 +328,7 @@ namespace SimpleWeb {
                         //Capture write_buffer in lambda so it is not destroyed before async_write is finished
                         boost::asio::async_write(*connection->socket, *write_buffer, 
                                 [this, connection, write_buffer, read_buffer, &endp]
-                                (const boost::system::error_code& ec, size_t bytes_transferred) {
+                                (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 connection_open(connection, *endp.second);
                                 read_message(connection, read_buffer, *endp.second);
@@ -361,7 +361,7 @@ namespace SimpleWeb {
                 std::shared_ptr<boost::asio::streambuf> read_buffer, Endpoint& endpoint) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
                     [this, connection, read_buffer, &endpoint]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+                    (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     std::istream stream(read_buffer.get());
 
@@ -385,7 +385,7 @@ namespace SimpleWeb {
                         //2 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
                                 [this, connection, read_buffer, &endpoint, fin_rsv_opcode]
-                                (const boost::system::error_code& ec, size_t bytes_transferred) {
+                                (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
                                 
@@ -408,7 +408,7 @@ namespace SimpleWeb {
                         //8 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(8),
                                 [this, connection, read_buffer, &endpoint, fin_rsv_opcode]
-                                (const boost::system::error_code& ec, size_t bytes_transferred) {
+                                (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
                                 
@@ -440,7 +440,7 @@ namespace SimpleWeb {
                 size_t length, Endpoint& endpoint, unsigned char fin_rsv_opcode) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(4+length),
                     [this, connection, read_buffer, length, &endpoint, fin_rsv_opcode]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+                    (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     std::istream raw_message_data(read_buffer.get());
 
@@ -531,12 +531,12 @@ namespace SimpleWeb {
         void timer_idle_init(std::shared_ptr<Connection> connection) {
             if(timeout_idle>0) {
                 connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(asio_io_service));
-                connection->timer_idle->expires_from_now(boost::posix_time::seconds(timeout_idle));
+                connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)));
                 timer_idle_expired_function(connection);
             }
         }
         void timer_idle_reset(std::shared_ptr<Connection> connection) const {
-            if(timeout_idle>0 && connection->timer_idle->expires_from_now(boost::posix_time::seconds(timeout_idle))>0) {
+            if(timeout_idle>0 && connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)))>0) {
                 timer_idle_expired_function(connection);
             }
         }
