@@ -96,7 +96,7 @@ namespace SimpleWeb {
             //Create mask
             std::vector<unsigned char> mask;
             mask.resize(4);
-            std::uniform_int_distribution<int> dist(0,255);
+            std::uniform_int_distribution<unsigned short> dist(0,255);
             std::random_device rd;
             for(int c=0;c<4;c++) {
                 mask[c]=static_cast<unsigned char>(dist(rd));
@@ -216,7 +216,7 @@ namespace SimpleWeb {
             //Make random 16-byte nonce
             std::string nonce;
             nonce.resize(16);
-            std::uniform_int_distribution<int> dist(0,255);
+            std::uniform_int_distribution<unsigned short> dist(0,255);
             std::random_device rd;
             for(int c=0;c<16;c++)
                 nonce[c]=static_cast<unsigned char>(dist(rd));
