@@ -96,10 +96,10 @@ namespace SimpleWeb {
             //Create mask
             std::vector<unsigned char> mask;
             mask.resize(4);
-            std::uniform_int_distribution<unsigned char> dist;
+            std::uniform_int_distribution<int> dist(0,255);
             std::random_device rd;
             for(int c=0;c<4;c++) {
-                mask[c]=dist(rd);
+                mask[c]=static_cast<unsigned char>(dist(rd));
             }
 
             std::shared_ptr<boost::asio::streambuf> buffer(new boost::asio::streambuf);
@@ -113,11 +113,11 @@ namespace SimpleWeb {
                 int num_bytes;
                 if(length>0xffff) {
                     num_bytes=8;
-                    stream.put(127+128);
+                    stream.put(static_cast<unsigned char>(127+128));
                 }
                 else {
                     num_bytes=2;
-                    stream.put(126+128);
+                    stream.put(static_cast<unsigned char>(126+128));
                 }
                 
                 for(int c=num_bytes-1;c>=0;c--) {
@@ -125,7 +125,7 @@ namespace SimpleWeb {
                 }
             }
             else
-                stream.put(length+128);
+                stream.put(static_cast<unsigned char>(length+128));
             
             for(int c=0;c<4;c++) {
                 stream.put(mask[c]);
@@ -137,7 +137,7 @@ namespace SimpleWeb {
             
             //Need to copy the callback-function in case its destroyed
             boost::asio::async_write(*connection->socket, *buffer, 
-                    [this, buffer, callback](const boost::system::error_code& ec, size_t bytes_transferred) {
+                    [this, buffer, callback](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(callback) {
                     callback(ec);
                 }
@@ -159,7 +159,7 @@ namespace SimpleWeb {
             *send_stream << reason;
 
             //fin_rsv_opcode=136: message close
-            send(send_stream, [](const boost::system::error_code& ec){}, 136);
+            send(send_stream, [](const boost::system::error_code& /*ec*/){}, 136);
         }
         
     protected:
@@ -216,10 +216,10 @@ namespace SimpleWeb {
             //Make random 16-byte nonce
             std::string nonce;
             nonce.resize(16);
-            std::uniform_int_distribution<unsigned char> dist;
+            std::uniform_int_distribution<int> dist(0,255);
             std::random_device rd;
             for(int c=0;c<16;c++)
-                nonce[c]=dist(rd);
+                nonce[c]=static_cast<unsigned char>(dist(rd));
 
             std::string nonce_base64=Crypto::Base64::encode(nonce);
             request << "Sec-WebSocket-Key: " << nonce_base64 << "\r\n";
@@ -231,13 +231,13 @@ namespace SimpleWeb {
             
             boost::asio::async_write(*connection->socket, *write_buffer, 
                     [this, write_buffer, accept_sha1]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+                    (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     std::shared_ptr<Message> message(new Message());
 
                     boost::asio::async_read_until(*connection->socket, message->streambuf, "\r\n\r\n",
                             [this, message, accept_sha1]
-                            (const boost::system::error_code& ec, size_t bytes_transferred) {
+                            (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         if(!ec) {                            
                             parse_handshake(*message);
                             if(Crypto::Base64::decode(connection->header["Sec-WebSocket-Accept"])==*accept_sha1) {
@@ -276,7 +276,7 @@ namespace SimpleWeb {
         
         void read_message(std::shared_ptr<Message> message) {
             boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(2),
-                    [this, message](const boost::system::error_code& ec, size_t bytes_transferred) {
+                    [this, message](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     std::vector<unsigned char> first_bytes;
                     first_bytes.resize(2);
@@ -299,7 +299,7 @@ namespace SimpleWeb {
                         //2 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(2),
                                 [this, message]
-                                (const boost::system::error_code& ec, size_t bytes_transferred) {
+                                (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::vector<unsigned char> length_bytes;
                                 length_bytes.resize(2);
@@ -323,7 +323,7 @@ namespace SimpleWeb {
                         //8 next bytes is the size of content
                         boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(8),
                                 [this, message]
-                                (const boost::system::error_code& ec, size_t bytes_transferred) {
+                                (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::vector<unsigned char> length_bytes;
                                 length_bytes.resize(8);
@@ -358,7 +358,7 @@ namespace SimpleWeb {
         void read_message_content(std::shared_ptr<Message> message) {
             boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(message->length), 
                     [this, message]
-                    (const boost::system::error_code& ec, size_t bytes_transferred) {
+                    (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     //If connection close
                     if((message->fin_rsv_opcode&0x0f)==8) {
