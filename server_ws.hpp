@@ -41,13 +41,11 @@ namespace SimpleWeb {
             //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
             std::unique_ptr<socket_type> socket;
             
-            boost::asio::strand strand;
-            
             std::atomic<bool> closed;
 
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
 
-            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
+            Connection(socket_type *socket): socket(socket), closed(false) {}
             
             void read_remote_endpoint_data() {
                 try {
@@ -103,9 +101,8 @@ namespace SimpleWeb {
             friend class SocketServerBase<socket_type>;
         private:
             boost::asio::streambuf streambuf;
-            std::atomic<bool> sending;
         public:
-            SendStream(): std::ostream(&streambuf), sending(false) {}
+            SendStream(): std::ostream(&streambuf) {}
             size_t size() {
                 return streambuf.size();
             }
@@ -182,21 +179,11 @@ namespace SimpleWeb {
             else
                 stream.put(static_cast<unsigned char>(length));
 
-            boost::asio::spawn(connection->strand, [this, connection, buffer, send_stream, callback](boost::asio::yield_context yield) {
-                //Need to copy the callback-function in case its destroyed
-                boost::system::error_code ec;
-                boost::asio::async_write(*connection->socket, *buffer, yield[ec]);
-                if(ec) {
-                    if(callback)
-                        callback(ec);
-                    return;
-                }
-
-                if(send_stream->sending==true)
-                    throw std::runtime_error("SendStream already in use! Only reuse a SendStream if you are sure a prior send operation using the stream is finished.");
-                send_stream->sending=true;
-                boost::asio::async_write(*connection->socket, send_stream->streambuf, yield[ec]);
-                send_stream->sending=false;
+            stream << send_stream->rdbuf(); //TODO: Create custom streambuf so that these two streambufs are combined into one streambuf
+            
+            boost::asio::async_write(*connection->socket, *buffer,
+                                     [this, connection, buffer, callback]
+                                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(callback)
                     callback(ec);
             });
