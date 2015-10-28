@@ -179,10 +179,13 @@ namespace SimpleWeb {
             else
                 stream.put(static_cast<unsigned char>(length));
 
-            stream << send_stream->rdbuf(); //TODO: Create custom streambuf so that these two streambufs are combined into one streambuf
+            std::vector<boost::asio::const_buffer> buffers;
+            buffers.reserve(2);
+            buffers.emplace_back(boost::asio::buffer(buffer->data()));
+            buffers.emplace_back(boost::asio::buffer(send_stream->streambuf.data()));
             
-            boost::asio::async_write(*connection->socket, *buffer,
-                                     [this, connection, buffer, callback]
+            boost::asio::async_write(*connection->socket, buffers,
+                                     [this, connection, buffer, send_stream, callback]
                                      (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(callback)
                     callback(ec);
