@@ -19,7 +19,7 @@ find_package(Boost 1.54.0 COMPONENTS system regex thread REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 if(APPLE)
-  set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+  set(OPENSSL_INCLUDE_DIR "/usr/local/opt/openssl/include")
 endif()
 
 #TODO: add requirement for version 1.0.1g (can it be done in one line?)
