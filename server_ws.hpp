@@ -11,6 +11,7 @@
 #include <thread>
 #include <mutex>
 #include <set>
+#include <list>
 #include <memory>
 #include <atomic>
 
@@ -49,6 +50,8 @@ namespace SimpleWeb {
             unsigned short remote_endpoint_port;
             
         private:
+            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
+            
             class SendData {
             public:
                 SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
@@ -77,18 +80,20 @@ namespace SimpleWeb {
                                 auto send_queued=send_queue.begin();
                                 if(send_queued->callback)
                                     send_queued->callback(ec);
-                                send_queue.erase(send_queued);
-                                if(send_queue.size()>0)
-                                    send_from_queue();
+                                if(!ec) {
+                                    send_queue.erase(send_queued);
+                                    if(send_queue.size()>0)
+                                        send_from_queue();
+                                }
+                                else
+                                    send_queue.clear();
                             }));
                         }
                         else {
                             auto send_queued=send_queue.begin();
                             if(send_queued->callback)
                                 send_queued->callback(ec);
-                            send_queue.erase(send_queued);
-                            if(send_queue.size()>0)
-                                send_from_queue();
+                            send_queue.clear();
                         }
                     }));
                 });
@@ -97,8 +102,6 @@ namespace SimpleWeb {
             std::atomic<bool> closed;
 
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
-
-            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
             
             void read_remote_endpoint_data() {
                 try {
@@ -403,10 +406,9 @@ namespace SimpleWeb {
                     
                     //Close connection if unmasked message from client (protocol error)
                     if(first_bytes[1]<128) {
-                        auto reason=std::make_shared<std::string>("message from client not masked");
-                        send_close(connection, 1002, *reason, [this, connection, &endpoint, reason](const boost::system::error_code& ec) {
-                            connection_close(connection, endpoint, 1002, *reason);
-                        });
+                        const std::string reason("message from client not masked");
+                        send_close(connection, 1002, reason, [this, connection](const boost::system::error_code& ec) {});
+                        connection_close(connection, endpoint, 1002, reason);
                         return;
                     }
                     
@@ -498,10 +500,9 @@ namespace SimpleWeb {
                             status=(byte1<<8)+byte2;
                         }
                         
-                        auto reason=std::make_shared<std::string>(message->string());
-                        send_close(connection, status, *reason, [this, connection, &endpoint, status, reason](const boost::system::error_code& ec) {
-                            connection_close(connection, endpoint, status, *reason);
-                        });
+                        auto reason=message->string();
+                        send_close(connection, status, reason, [this, connection](const boost::system::error_code& ec) {});
+                        connection_close(connection, endpoint, status, reason);
                         return;
                     }
                     else {

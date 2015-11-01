@@ -39,7 +39,7 @@ namespace SimpleWeb {
             asio_resolver.async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    connection=std::unique_ptr<Connection>(new Connection(new WSS(asio_io_service, asio_context)));
+                    connection=std::shared_ptr<Connection>(new Connection(new WSS(asio_io_service, asio_context)));
                     
                     boost::asio::async_connect(connection->socket->lowest_layer(), it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
