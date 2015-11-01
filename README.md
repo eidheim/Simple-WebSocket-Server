@@ -16,9 +16,6 @@ See also https://github.com/eidheim/Simple-Web-Server for an easy way to make RE
 * An easy to use WebSocket and WebSocket Secure client library
 * C++ bindings to the following OpenSSL methods: Base64, MD5, SHA1, SHA256 and SHA512 (found in crypto.hpp)
 
-### TODO
-* Data from client is currently moved to a separate stream while doing masking. This should happen in the stream instead using a custom stream buffer.
-
 ###Usage
 
 See ws_examples.cpp or wss_examples.cpp for example usage. 
