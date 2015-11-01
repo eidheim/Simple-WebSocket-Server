@@ -2,7 +2,6 @@
 #include "client_wss.hpp"
 
 using namespace std;
-using namespace SimpleWeb;
 
 typedef SimpleWeb::SocketServer<SimpleWeb::WSS> WssServer;
 typedef SimpleWeb::SocketClient<SimpleWeb::WSS> WssClient;
@@ -20,11 +19,11 @@ int main() {
     auto& echo=server.endpoint["^/echo/?$"];
     
     echo.onmessage=[&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
-        auto message_str=message->string();
         //WssServer::Message::string() is a convenience function for:
         //stringstream data_ss;
         //data_ss << message->rdbuf();
         //auto message_str = data_ss.str();
+        auto message_str=message->string();
         
         cout << "Server: Message received: \"" << message_str << "\" from " << (size_t)connection.get() << endl;
                 
@@ -57,8 +56,33 @@ int main() {
                 "Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
+    //Example 2: Echo thrice
+    //  Sending received messages to three times to connected client
+    //  Test with the following JavaScript on more than one browser windows:
+    //    var ws=new WebSocket("wss://localhost:8080/echo_thrice");
+    //    ws.onmessage=function(evt){console.log(evt.data);};
+    //    ws.send("test");
+    auto& echo_thrice=server.endpoint["^/echo_thrice/?$"];
+    echo_thrice.onmessage=[&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
+        auto message_str=message->string();
+        
+        auto send_stream1=make_shared<WssServer::SendStream>();
+        *send_stream1 << message_str;
+        //server.send is an asynchronous function
+        server.send(connection, send_stream1, [&server, connection, message_str](const boost::system::error_code& ec) {
+            if(!ec) {
+                auto send_stream3=make_shared<WssServer::SendStream>();
+                *send_stream3 << message_str;
+                server.send(connection, send_stream3); //Sent after send_stream1 is sent, and most likely after send_stream2
+            }
+        });
+        //Do not reuse send_stream1 here as it most likely is not sent yet
+        auto send_stream2=make_shared<WssServer::SendStream>();
+        *send_stream2 << message_str;
+        server.send(connection, send_stream2); //Most likely queued, and sent after send_stream1
+    };
 
-    //Example 2: Echo to all WebSocket Secure endpoints
+    //Example 3: Echo to all WebSocket Secure endpoints
     //  Sending received messages to all connected clients
     //  Test with the following JavaScript on more than one browser windows:
     //    var wss=new WebSocket("wss://localhost:8080/echo_all");
@@ -66,12 +90,7 @@ int main() {
     //    wss.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
     echo_all.onmessage=[&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
-        //To receive message from client as string (data_ss.str())
         auto message_str=message->string();
-        //WssServer::Message::string() is a convenience function for:
-        //stringstream data_ss;
-        //data_ss << message->rdbuf();
-        //auto message_str = data_ss.str();
         
         //echo_all.get_connections() can also be used to solely receive connections on this endpoint
         for(auto a_connection: server.get_connections()) {
@@ -91,7 +110,7 @@ int main() {
     //Wait for server to start so that the client can connect
     this_thread::sleep_for(chrono::seconds(1));
     
-    //Example 3: Client communication with server
+    //Example 4: Client communication with server
     //Second Client() parameter set to false: no certificate verification
     //Possible output:
     //Server: Opened connection 140184920260656
