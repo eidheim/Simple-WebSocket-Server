@@ -58,7 +58,7 @@ int main() {
     
     //Example 2: Echo thrice
     //  Sending received messages to three times to connected client
-    //  Test with the following JavaScript on more than one browser windows:
+    //  Test with the following JavaScript:
     //    var ws=new WebSocket("wss://localhost:8080/echo_thrice");
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
