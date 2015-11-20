@@ -27,7 +27,7 @@ See ws_examples.cpp or wss_examples.cpp for example usage.
 
 ### Compile
 
-Compile with a C++11 compiler supporting regex (for instance g++ 4.9):
+Compile with a C++11 supported compiler:
 
 ```sh
 cmake .
