@@ -57,7 +57,7 @@ int main() {
     };
     
     //Example 2: Echo thrice
-    //  Sending received messages to three times to connected client
+    //  Send a received message three times back to the client
     //  Test with the following JavaScript:
     //    var ws=new WebSocket("ws://localhost:8080/echo_thrice");
     //    ws.onmessage=function(evt){console.log(evt.data);};
