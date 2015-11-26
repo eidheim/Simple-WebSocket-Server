@@ -291,16 +291,17 @@ namespace SimpleWeb {
             //Not parsing the first line
             
             getline(stream, line);
-            size_t param_end=line.find(':');
-            while(param_end!=std::string::npos) {                
+            size_t param_end;
+            while((param_end=line.find(':'))!=std::string::npos) {
                 size_t value_start=param_end+1;
-                if(line[value_start]==' ')
-                    value_start++;
-
-                connection->header[line.substr(0, param_end)]=line.substr(value_start, line.size()-value_start-1);
-
+                if((value_start)<line.size()) {
+                    if(line[value_start]==' ')
+                        value_start++;
+                    if(value_start<line.size())
+                        connection->header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size()-value_start-1)));
+                }
+            
                 getline(stream, line);
-                param_end=line.find(':');
             }
         }
         
