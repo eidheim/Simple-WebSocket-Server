@@ -198,7 +198,7 @@ namespace SimpleWeb {
             
             //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
             threads.clear();
-            for(size_t c=1;c<num_threads;c++) {
+            for(size_t c=1;c<config.num_threads;c++) {
                 threads.emplace_back([this](){
                     io_service.run();
                 });
@@ -295,7 +295,6 @@ namespace SimpleWeb {
         boost::asio::io_service io_service;
         boost::asio::ip::tcp::acceptor acceptor;
         
-        size_t num_threads;
         std::vector<std::thread> threads;
         
         size_t timeout_request;
