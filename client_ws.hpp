@@ -115,11 +115,11 @@ namespace SimpleWeb {
         void start() {
             connect();
             
-            asio_io_service.run();
+            io_service.run();
         }
         
         void stop() {
-            asio_io_service.stop();
+            io_service.stop();
         }
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
@@ -195,16 +195,16 @@ namespace SimpleWeb {
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         
-        boost::asio::io_service asio_io_service;
-        boost::asio::ip::tcp::endpoint asio_endpoint;
-        boost::asio::ip::tcp::resolver asio_resolver;
+        boost::asio::io_service io_service;
+        boost::asio::ip::tcp::endpoint endpoint;
+        boost::asio::ip::tcp::resolver resolver;
         
         std::string host;
         unsigned short port;
         std::string path;
                 
         SocketClientBase(const std::string& host_port_path, unsigned short default_port) : 
-                asio_resolver(asio_io_service) {
+                resolver(io_service) {
             size_t host_end=host_port_path.find(':');
             size_t host_port_end=host_port_path.find('/');
             if(host_end==std::string::npos) {
@@ -447,10 +447,10 @@ namespace SimpleWeb {
         void connect() {
             boost::asio::ip::tcp::resolver::query query(host, std::to_string(port));
             
-            asio_resolver.async_resolve(query, [this]
+            resolver.async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    connection=std::shared_ptr<Connection>(new Connection(new WS(asio_io_service)));
+                    connection=std::shared_ptr<Connection>(new Connection(new WS(io_service)));
 
                     boost::asio::async_connect(*connection->socket, it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){

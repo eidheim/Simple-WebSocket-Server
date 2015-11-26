@@ -15,23 +15,23 @@ namespace SimpleWeb {
                 size_t timeout_request=5, size_t timeout_idle=0, 
                 const std::string& verify_file=std::string()) : 
                 SocketServerBase<WSS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle), 
-                asio_context(boost::asio::ssl::context::sslv23) {
-            asio_context.use_certificate_chain_file(cert_file);
-            asio_context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+                context(boost::asio::ssl::context::sslv23) {
+            context.use_certificate_chain_file(cert_file);
+            context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             
             if(verify_file.size()>0)
-                asio_context.load_verify_file(verify_file);
+                context.load_verify_file(verify_file);
         }
 
     private:
-        boost::asio::ssl::context asio_context;
+        boost::asio::ssl::context context;
         
         void accept() {
             //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<Connection> connection(new Connection(new WSS(asio_io_service, asio_context)));
+            std::shared_ptr<Connection> connection(new Connection(new WSS(io_service, context)));
             
-            asio_acceptor.async_accept(connection->socket->lowest_layer(), [this, connection](const boost::system::error_code& ec) {
+            acceptor.async_accept(connection->socket->lowest_layer(), [this, connection](const boost::system::error_code& ec) {
                 //Immediately start accepting a new connection
                 accept();
 

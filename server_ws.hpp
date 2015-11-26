@@ -153,6 +153,22 @@ namespace SimpleWeb {
             }
         };
         
+        class Config {
+            friend class SocketServerBase<socket_type>;
+        private:
+            Config(unsigned short port, size_t num_threads): port(port), num_threads(num_threads) {}
+            unsigned short port;
+            size_t num_threads;
+        public:
+            ///IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
+            ///If empty, the address will be any address.
+            std::string address;
+            ///Set to false to avoid binding the socket to an address that is already in use.
+            bool reuse_address=true;
+        };
+        ///Set before calling start().
+        Config config;
+        
         std::map<std::string, Endpoint> endpoint;
         
     private:
@@ -165,18 +181,31 @@ namespace SimpleWeb {
                 opt_endpoint.emplace_back(boost::regex(endp.first), &endp.second);
             }
             
+            if(io_service.stopped())
+                io_service.reset();
+            
+            boost::asio::ip::tcp::endpoint endpoint;
+            if(config.address.size()>0)
+                endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(config.address), config.port);
+            else
+                endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), config.port);
+            acceptor.open(endpoint.protocol());
+            acceptor.set_option(boost::asio::socket_base::reuse_address(config.reuse_address));
+            acceptor.bind(endpoint);
+            acceptor.listen();
+            
             accept();
             
             //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
             threads.clear();
             for(size_t c=1;c<num_threads;c++) {
                 threads.emplace_back([this](){
-                    asio_io_service.run();
+                    io_service.run();
                 });
             }
 
             //Main thread
-            asio_io_service.run();
+            io_service.run();
 
             //Wait for the rest of the threads, if any, to finish as well
             for(auto& t: threads) {
@@ -185,7 +214,8 @@ namespace SimpleWeb {
         }
         
         void stop() {
-            asio_io_service.stop();
+            acceptor.close();
+            io_service.stop();
             
             for(auto& p: endpoint)
                 p.second.connections.clear();
@@ -229,8 +259,7 @@ namespace SimpleWeb {
                     connection->send_from_queue();
             });
         }
-        
-        
+
         void send_close(std::shared_ptr<Connection> connection, int status, const std::string& reason="",
                 const std::function<void(const boost::system::error_code&)>& callback=nullptr) const {
             //Send close only once (in case close is initiated by server)
@@ -263,9 +292,8 @@ namespace SimpleWeb {
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
                 
-        boost::asio::io_service asio_io_service;
-        boost::asio::ip::tcp::endpoint asio_endpoint;
-        boost::asio::ip::tcp::acceptor asio_acceptor;
+        boost::asio::io_service io_service;
+        boost::asio::ip::tcp::acceptor acceptor;
         
         size_t num_threads;
         std::vector<std::thread> threads;
@@ -274,13 +302,13 @@ namespace SimpleWeb {
         size_t timeout_idle;
         
         SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
-                asio_endpoint(boost::asio::ip::tcp::v4(), port), asio_acceptor(asio_io_service, asio_endpoint),
-                num_threads(num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle) {}
+                config(port, num_threads), acceptor(io_service),
+                timeout_request(timeout_request), timeout_idle(timeout_idle) {}
         
         virtual void accept()=0;
         
         std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
-            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(asio_io_service));
+            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(io_service));
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
@@ -322,24 +350,30 @@ namespace SimpleWeb {
         void parse_handshake(std::shared_ptr<Connection> connection, std::istream& stream) const {
             std::string line;
             getline(stream, line);
-            size_t method_end=line.find(' ');
-            size_t path_end=line.find(' ', method_end+1);
-            if(method_end!=std::string::npos && path_end!=std::string::npos) {
-                connection->method=line.substr(0, method_end);
-                connection->path=line.substr(method_end+1, path_end-method_end-1);
-                connection->http_version=line.substr(path_end+6, line.size()-path_end-7);
-
-                getline(stream, line);
-                size_t param_end=line.find(':');
-                while(param_end!=std::string::npos) {                
-                    size_t value_start=param_end+1;
-                    if(line[value_start]==' ')
-                        value_start++;
-
-                    connection->header[line.substr(0, param_end)]=line.substr(value_start, line.size()-value_start-1);
-
+            size_t method_end;
+            if((method_end=line.find(' '))!=std::string::npos) {
+                size_t path_end;
+                if((path_end=line.find(' ', method_end+1))!=std::string::npos) {
+                    connection->method=line.substr(0, method_end);
+                    connection->path=line.substr(method_end+1, path_end-method_end-1);
+                    if((path_end+6)<line.size())
+                        connection->http_version=line.substr(path_end+6, line.size()-(path_end+6)-1);
+                    else
+                        connection->http_version="1.1";
+            
                     getline(stream, line);
-                    param_end=line.find(':');
+                    size_t param_end;
+                    while((param_end=line.find(':'))!=std::string::npos) {
+                        size_t value_start=param_end+1;
+                        if((value_start)<line.size()) {
+                            if(line[value_start]==' ')
+                                value_start++;
+                            if(value_start<line.size())
+                                connection->header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size()-value_start-1)));
+                        }
+            
+                        getline(stream, line);
+                    }
                 }
             }
         }
@@ -563,7 +597,7 @@ namespace SimpleWeb {
         
         void timer_idle_init(std::shared_ptr<Connection> connection) {
             if(timeout_idle>0) {
-                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(asio_io_service));
+                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(io_service));
                 connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)));
                 timer_idle_expired_function(connection);
             }
@@ -603,9 +637,9 @@ namespace SimpleWeb {
         void accept() {
             //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<Connection> connection(new Connection(new WS(asio_io_service)));
+            std::shared_ptr<Connection> connection(new Connection(new WS(io_service)));
             
-            asio_acceptor.async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
+            acceptor.async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
                 //Immediately start accepting a new connection
                 accept();
                 if(!ec) {

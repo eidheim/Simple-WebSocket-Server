@@ -13,7 +13,7 @@ public:
     void accept() {}
     
     bool parse_request_test() {
-        std::shared_ptr<Connection> connection(new Connection(new WS(asio_io_service)));
+        std::shared_ptr<Connection> connection(new Connection(new WS(io_service)));
         
         stringstream ss;
         ss << "GET /test/ HTTP/1.1\r\n";
@@ -97,7 +97,7 @@ public:
     }
     
     bool parse_response_header_test() {
-        connection=std::unique_ptr<Connection>(new Connection(new WS(asio_io_service)));
+        connection=std::unique_ptr<Connection>(new Connection(new WS(io_service)));
         
         stringstream ss;
         ss << "HTTP/1.1 200 OK\r\n";

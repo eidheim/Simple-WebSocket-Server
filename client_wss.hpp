@@ -14,32 +14,32 @@ namespace SimpleWeb {
                 const std::string& cert_file=std::string(), const std::string& private_key_file=std::string(), 
                 const std::string& verify_file=std::string()) : 
                 SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
-                asio_context(boost::asio::ssl::context::sslv23) {
+                context(boost::asio::ssl::context::sslv23) {
             if(verify_certificate)
-                asio_context.set_verify_mode(boost::asio::ssl::verify_peer);
+                context.set_verify_mode(boost::asio::ssl::verify_peer);
             else
-                asio_context.set_verify_mode(boost::asio::ssl::verify_none);
+                context.set_verify_mode(boost::asio::ssl::verify_none);
             
             if(cert_file.size()>0 && private_key_file.size()>0) {
-                asio_context.use_certificate_chain_file(cert_file);
-                asio_context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+                context.use_certificate_chain_file(cert_file);
+                context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             }
             
             if(verify_file.size()>0)
-                asio_context.load_verify_file(verify_file);
+                context.load_verify_file(verify_file);
 
         };
 
     private:
-        boost::asio::ssl::context asio_context;
+        boost::asio::ssl::context context;
         
         void connect() {
             boost::asio::ip::tcp::resolver::query query(host, std::to_string(port));
             
-            asio_resolver.async_resolve(query, [this]
+            resolver.async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    connection=std::shared_ptr<Connection>(new Connection(new WSS(asio_io_service, asio_context)));
+                    connection=std::shared_ptr<Connection>(new Connection(new WSS(io_service, context)));
                     
                     boost::asio::async_connect(connection->socket->lowest_layer(), it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
