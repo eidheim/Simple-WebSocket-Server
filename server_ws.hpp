@@ -71,6 +71,10 @@ namespace SimpleWeb {
             
             void send_from_queue() {
                 strand.post([this]() {
+                    if(!socket) {
+                        return;
+                    }
+
                     boost::asio::async_write(*socket, send_queue.begin()->header_stream->streambuf,
                             strand.wrap([this](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         if(!ec) {
