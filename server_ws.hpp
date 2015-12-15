@@ -54,9 +54,10 @@ namespace SimpleWeb {
             
             class SendData {
             public:
-                SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
+                SendData(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
                         const std::function<void(const boost::system::error_code)> &callback) :
-                        header_stream(header_stream), message_stream(message_stream), callback(callback) {}
+                        connection(connection), header_stream(header_stream), message_stream(message_stream), callback(callback) {}
+                std::shared_ptr<Connection> connection; //Added to keep the connection object alive
                 std::shared_ptr<SendStream> header_stream;
                 std::shared_ptr<SendStream> message_stream;
                 std::function<void(const boost::system::error_code)> callback;
@@ -71,10 +72,6 @@ namespace SimpleWeb {
             
             void send_from_queue() {
                 strand.post([this]() {
-                    if(!socket) {
-                        return;
-                    }
-
                     boost::asio::async_write(*socket, send_queue.begin()->header_stream->streambuf,
                             strand.wrap([this](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         if(!ec) {
@@ -258,7 +255,7 @@ namespace SimpleWeb {
                 header_stream->put(static_cast<unsigned char>(length));
 
             connection->strand.post([this, connection, header_stream, message_stream, callback]() {
-                connection->send_queue.emplace_back(header_stream, message_stream, callback);
+                connection->send_queue.emplace_back(connection, header_stream, message_stream, callback);
                 if(connection->send_queue.size()==1)
                     connection->send_from_queue();
             });
