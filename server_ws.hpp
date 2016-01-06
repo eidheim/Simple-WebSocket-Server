@@ -86,15 +86,18 @@ namespace SimpleWeb {
                                     if(send_queue.size()>0)
                                         send_from_queue();
                                 }
-                                else
-                                    send_queue.clear();
+                                else {
+                                    for(auto it=send_queue.begin();it!=send_queue.end();)
+                                        it=send_queue.erase(it);
+                                }
                             }));
                         }
                         else {
                             auto send_queued=send_queue.begin();
                             if(send_queued->callback)
                                 send_queued->callback(ec);
-                            send_queue.clear();
+                            for(auto it=send_queue.begin();it!=send_queue.end();)
+                                it=send_queue.erase(it);
                         }
                     }));
                 });
