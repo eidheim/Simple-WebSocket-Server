@@ -54,10 +54,9 @@ namespace SimpleWeb {
             
             class SendData {
             public:
-                SendData(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
+                SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
                         const std::function<void(const boost::system::error_code)> &callback) :
-                        connection(connection), header_stream(header_stream), message_stream(message_stream), callback(callback) {}
-                std::shared_ptr<Connection> connection; //Added to keep the connection object alive
+                        header_stream(header_stream), message_stream(message_stream), callback(callback) {}
                 std::shared_ptr<SendStream> header_stream;
                 std::shared_ptr<SendStream> message_stream;
                 std::function<void(const boost::system::error_code)> callback;
@@ -70,13 +69,13 @@ namespace SimpleWeb {
             
             std::list<SendData> send_queue;
             
-            void send_from_queue() {
-                strand.post([this]() {
+            void send_from_queue(std::shared_ptr<Connection> connection) {
+                strand.post([this, connection]() {
                     boost::asio::async_write(*socket, send_queue.begin()->header_stream->streambuf,
-                            strand.wrap([this](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
+                            strand.wrap([this, connection](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         if(!ec) {
                             boost::asio::async_write(*socket, send_queue.begin()->message_stream->streambuf,
-                                    strand.wrap([this]
+                                    strand.wrap([this, connection]
                                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                                 auto send_queued=send_queue.begin();
                                 if(send_queued->callback)
@@ -84,20 +83,17 @@ namespace SimpleWeb {
                                 if(!ec) {
                                     send_queue.erase(send_queued);
                                     if(send_queue.size()>0)
-                                        send_from_queue();
+                                        send_from_queue(connection);
                                 }
-                                else {
-                                    for(auto it=send_queue.begin();it!=send_queue.end();)
-                                        it=send_queue.erase(it);
-                                }
+                                else
+                                    send_queue.clear();
                             }));
                         }
                         else {
                             auto send_queued=send_queue.begin();
                             if(send_queued->callback)
                                 send_queued->callback(ec);
-                            for(auto it=send_queue.begin();it!=send_queue.end();)
-                                it=send_queue.erase(it);
+                            send_queue.clear();
                         }
                     }));
                 });
@@ -258,9 +254,9 @@ namespace SimpleWeb {
                 header_stream->put(static_cast<unsigned char>(length));
 
             connection->strand.post([this, connection, header_stream, message_stream, callback]() {
-                connection->send_queue.emplace_back(connection, header_stream, message_stream, callback);
+                connection->send_queue.emplace_back(header_stream, message_stream, callback);
                 if(connection->send_queue.size()==1)
-                    connection->send_from_queue();
+                    connection->send_from_queue(connection);
             });
         }
 
