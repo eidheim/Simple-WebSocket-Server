@@ -228,6 +228,8 @@ namespace SimpleWeb {
             else
                 host=host_port_path.substr(0, host_end);
         }
+
+        ~SocketClientBase() { connection.reset(); }
         
         virtual void connect()=0;
         
