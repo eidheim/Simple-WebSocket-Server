@@ -3,7 +3,7 @@ Simple-WebSocket-Server
 
 A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebSocket Secure (WSS) server and client library implemented using C++11, Boost.Asio and OpenSSL. Created to be an easy way to make WebSocket endpoints in C++.
 
-See also https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. 
+See https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. Also, feel free to check out the new C++ IDE supporting C++11/14/17: https://github.com/cppit/jucipp. 
 
 ### Features
 
