@@ -414,12 +414,12 @@ namespace SimpleWeb {
                             onclose(status, reason);
                         return;
                     }
-                    //If ping
-                    else if((message->fin_rsv_opcode&0x0f)==9) {
-                        //send pong
-                        auto empty_send_stream=std::make_shared<SendStream>();
-                        send(empty_send_stream, nullptr, message->fin_rsv_opcode+1);
-                    }
+                    //If ping //Hiale: handle it in user code
+                    //else if((message->fin_rsv_opcode&0x0f)==9) {
+                    //    //send pong
+                    //    auto empty_send_stream=std::make_shared<SendStream>();
+                    //    send(empty_send_stream, nullptr, message->fin_rsv_opcode+1);
+                    //}
                     else if(onmessage) {
                         onmessage(message);
                     }
