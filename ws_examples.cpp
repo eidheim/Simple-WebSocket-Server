@@ -46,7 +46,7 @@ int main() {
     };
     
     //See RFC 6455 7.4.1. for status codes
-    echo.onclose=[](shared_ptr<WsServer::Connection> connection, int status, const string& reason) {
+    echo.onclose=[](shared_ptr<WsServer::Connection> connection, int status, const string& /*reason*/) {
         cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
@@ -89,7 +89,7 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    echo_all.onmessage=[&server](shared_ptr<WsServer::Connection> /*connection*/, shared_ptr<WsServer::Message> message) {
         auto message_str=message->string();
         
         //echo_all.get_connections() can also be used to solely receive connections on this endpoint
@@ -142,7 +142,7 @@ int main() {
         client.send(send_stream);
     };
     
-    client.onclose=[](int status, const string& reason) {
+    client.onclose=[](int status, const string& /*reason*/) {
         cout << "Client: Closed connection with status code " << status << endl;
     };
     

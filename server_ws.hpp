@@ -440,7 +440,7 @@ namespace SimpleWeb {
                     //Close connection if unmasked message from client (protocol error)
                     if(first_bytes[1]<128) {
                         const std::string reason("message from client not masked");
-                        send_close(connection, 1002, reason, [this, connection](const boost::system::error_code& ec) {});
+                        send_close(connection, 1002, reason, [this, connection](const boost::system::error_code& /*ec*/) {});
                         connection_close(connection, endpoint, 1002, reason);
                         return;
                     }
@@ -534,7 +534,7 @@ namespace SimpleWeb {
                         }
                         
                         auto reason=message->string();
-                        send_close(connection, status, reason, [this, connection](const boost::system::error_code& ec) {});
+                        send_close(connection, status, reason, [this, connection](const boost::system::error_code& /*ec*/) {});
                         connection_close(connection, endpoint, status, reason);
                         return;
                     }
