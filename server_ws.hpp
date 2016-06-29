@@ -156,10 +156,10 @@ namespace SimpleWeb {
         class Config {
             friend class SocketServerBase<socket_type>;
         private:
-            Config(unsigned short port, size_t num_threads): port(port), num_threads(num_threads), reuse_address(true) {}
-            unsigned short port;
+            Config(unsigned short port, size_t num_threads): num_threads(num_threads), port(port), reuse_address(true) {}
             size_t num_threads;
         public:
+            unsigned short port;
             ///IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
             ///If empty, the address will be any address.
             std::string address;
