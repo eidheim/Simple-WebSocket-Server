@@ -24,6 +24,8 @@ namespace SimpleWeb {
     template <class socket_type>
     class SocketServerBase {
     public:
+        virtual ~SocketServerBase() {}
+        
         class SendStream : public std::ostream {
             friend class SocketServerBase<socket_type>;
         private:

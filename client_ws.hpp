@@ -18,6 +18,8 @@ namespace SimpleWeb {
     template <class socket_type>
     class SocketClientBase {
     public:
+        virtual ~SocketClientBase() { connection.reset(); }
+        
         class SendStream : public std::iostream {
             friend class SocketClientBase<socket_type>;
         private:
@@ -228,8 +230,6 @@ namespace SimpleWeb {
             else
                 host=host_port_path.substr(0, host_end);
         }
-
-        ~SocketClientBase() { connection.reset(); }
         
         virtual void connect()=0;
         
