@@ -49,7 +49,7 @@ string to_hex_string(type chars) {
     return hex_ss.str();
 }
 
-int main(int argc, char** argv) {
+int main() {
     //Testing SimpleWeb::Crypt::Base64
     for(auto& string_test: Base64_string_tests) {
         if(Crypto::Base64::encode(string_test.first)!=string_test.second) {

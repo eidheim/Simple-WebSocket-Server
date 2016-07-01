@@ -18,6 +18,8 @@ namespace SimpleWeb {
     template <class socket_type>
     class SocketClientBase {
     public:
+        virtual ~SocketClientBase() { connection.reset(); }
+        
         class SendStream : public std::iostream {
             friend class SocketClientBase<socket_type>;
         private:
@@ -228,8 +230,6 @@ namespace SimpleWeb {
             else
                 host=host_port_path.substr(0, host_end);
         }
-
-        ~SocketClientBase() { connection.reset(); }
         
         virtual void connect()=0;
         
@@ -325,7 +325,7 @@ namespace SimpleWeb {
                     if(first_bytes[1]>=128) {
                         const std::string reason("message from server masked");
                         auto kept_connection=connection;
-                        send_close(1002, reason, [this, kept_connection](const boost::system::error_code& ec) {});
+                        send_close(1002, reason, [this, kept_connection](const boost::system::error_code& /*ec*/) {});
                         if(onclose)
                             onclose(1002, reason);
                         return;
@@ -409,7 +409,7 @@ namespace SimpleWeb {
                         
                         auto reason=message->string();
                         auto kept_connection=connection;
-                        send_close(status, reason, [this, kept_connection](const boost::system::error_code& ec) {});
+                        send_close(status, reason, [this, kept_connection](const boost::system::error_code& /*ec*/) {});
                         if(onclose)
                             onclose(status, reason);
                         return;
@@ -456,7 +456,7 @@ namespace SimpleWeb {
                     connection=std::shared_ptr<Connection>(new Connection(new WS(io_service)));
 
                     boost::asio::async_connect(*connection->socket, it, [this]
-                            (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
+                            (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator /*it*/){
                         if(!ec) {
                             handshake();
                         }

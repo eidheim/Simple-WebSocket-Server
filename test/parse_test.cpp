@@ -124,7 +124,7 @@ public:
     }
 };
 
-int main(int argc, char** argv) {
+int main() {
     SocketServerTest serverTest;
     if(!serverTest.parse_request_test()) {
         cerr << "FAIL SocketServer::parse_request" << endl;
