@@ -24,6 +24,8 @@ namespace SimpleWeb {
     template <class socket_type>
     class SocketServerBase {
     public:
+        virtual ~SocketServerBase() {}
+        
         class SendStream : public std::ostream {
             friend class SocketServerBase<socket_type>;
         private:
@@ -156,10 +158,10 @@ namespace SimpleWeb {
         class Config {
             friend class SocketServerBase<socket_type>;
         private:
-            Config(unsigned short port, size_t num_threads): port(port), num_threads(num_threads), reuse_address(true) {}
-            unsigned short port;
+            Config(unsigned short port, size_t num_threads): num_threads(num_threads), port(port), reuse_address(true) {}
             size_t num_threads;
         public:
+            unsigned short port;
             ///IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
             ///If empty, the address will be any address.
             std::string address;
@@ -440,7 +442,7 @@ namespace SimpleWeb {
                     //Close connection if unmasked message from client (protocol error)
                     if(first_bytes[1]<128) {
                         const std::string reason("message from client not masked");
-                        send_close(connection, 1002, reason, [this, connection](const boost::system::error_code& ec) {});
+                        send_close(connection, 1002, reason, [this, connection](const boost::system::error_code& /*ec*/) {});
                         connection_close(connection, endpoint, 1002, reason);
                         return;
                     }
@@ -534,7 +536,7 @@ namespace SimpleWeb {
                         }
                         
                         auto reason=message->string();
-                        send_close(connection, status, reason, [this, connection](const boost::system::error_code& ec) {});
+                        send_close(connection, status, reason, [this, connection](const boost::system::error_code& /*ec*/) {});
                         connection_close(connection, endpoint, status, reason);
                         return;
                     }

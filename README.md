@@ -8,7 +8,8 @@ See https://github.com/eidheim/Simple-Web-Server for an easy way to make REST re
 ### Features
 
 * RFC 6455 mostly supported: text/binary frames, ping-pong, connection close with status and reason.
-* Thread pool
+* Asynchronous message handling
+* Thread pool if needed
 * Platform independent
 * WebSocket Secure support
 * Timeouts, if any of SocketServer::timeout_request and SocketServer::timeout_idle are >0 (default: SocketServer::timeout_request=5 seconds, and SocketServer::timeout_idle=0 seconds; no timeout on idle connections)
