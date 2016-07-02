@@ -111,6 +111,7 @@ namespace SimpleWeb {
         std::function<void(std::shared_ptr<Message>)> onmessage;
         std::function<void(const boost::system::error_code&)> onerror;
         std::function<void(int, const std::string&)> onclose;
+		std::function<bool(void)> onping;
         
         void start() {
             connect();
@@ -414,12 +415,17 @@ namespace SimpleWeb {
                             onclose(status, reason);
                         return;
                     }
-                    //If ping //Hiale: handle it in user code
-                    //else if((message->fin_rsv_opcode&0x0f)==9) {
-                    //    //send pong
-                    //    auto empty_send_stream=std::make_shared<SendStream>();
-                    //    send(empty_send_stream, nullptr, message->fin_rsv_opcode+1);
-                    //}
+                    //If ping
+					else if((message->fin_rsv_opcode&0x0f)==9) {
+						auto cancel = false;
+						if (onping)
+							cancel = onping();
+						if (!cancel) {
+							    //send pong
+							    auto empty_send_stream=std::make_shared<SendStream>();
+							    send(empty_send_stream, nullptr, message->fin_rsv_opcode+1);
+						}
+					}
                     else if(onmessage) {
                         onmessage(message);
                     }
