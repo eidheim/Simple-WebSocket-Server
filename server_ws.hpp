@@ -20,12 +20,12 @@
 namespace SimpleWeb {
     template <class socket_type>
     class SocketServer;
-        
+
     template <class socket_type>
     class SocketServerBase {
     public:
         virtual ~SocketServerBase() {}
-        
+
         class SendStream : public std::ostream {
             friend class SocketServerBase<socket_type>;
         private:
@@ -36,24 +36,24 @@ namespace SimpleWeb {
                 return streambuf.size();
             }
         };
-        
+
         class Connection {
             friend class SocketServerBase<socket_type>;
             friend class SocketServer<socket_type>;
-            
+
         public:
             std::string method, path, http_version;
 
             std::unordered_map<std::string, std::string> header;
 
             boost::smatch path_match;
-            
+
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
-            
+
         private:
             Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
-            
+
             class SendData {
             public:
                 SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
@@ -63,14 +63,14 @@ namespace SimpleWeb {
                 std::shared_ptr<SendStream> message_stream;
                 std::function<void(const boost::system::error_code)> callback;
             };
-            
+
             //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
             std::unique_ptr<socket_type> socket;
-            
+
             boost::asio::strand strand;
-            
+
             std::list<SendData> send_queue;
-            
+
             void send_from_queue(std::shared_ptr<Connection> connection) {
                 strand.post([this, connection]() {
                     boost::asio::async_write(*socket, send_queue.begin()->header_stream->streambuf,
@@ -100,11 +100,11 @@ namespace SimpleWeb {
                     }));
                 });
             }
-            
+
             std::atomic<bool> closed;
 
             std::unique_ptr<boost::asio::deadline_timer> timer_idle;
-            
+
             void read_remote_endpoint_data() {
                 try {
                     remote_endpoint_address=socket->lowest_layer().remote_endpoint().address().to_string();
@@ -115,10 +115,10 @@ namespace SimpleWeb {
                 }
             }
         };
-        
+
         class Message : public std::istream {
             friend class SocketServerBase<socket_type>;
-            
+
         public:
             unsigned char fin_rsv_opcode;
             size_t size() {
@@ -134,19 +134,19 @@ namespace SimpleWeb {
             size_t length;
             boost::asio::streambuf streambuf;
         };
-        
+
         class Endpoint {
             friend class SocketServerBase<socket_type>;
         private:
             std::set<std::shared_ptr<Connection> > connections;
             std::mutex connections_mutex;
 
-        public:            
+        public:
             std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
-            
+
             std::set<std::shared_ptr<Connection> > get_connections() {
                 connections_mutex.lock();
                 auto copy=connections;
@@ -154,7 +154,7 @@ namespace SimpleWeb {
                 return copy;
             }
         };
-        
+
         class Config {
             friend class SocketServerBase<socket_type>;
         private:
@@ -170,22 +170,22 @@ namespace SimpleWeb {
         };
         ///Set before calling start().
         Config config;
-        
+
         std::map<std::string, Endpoint> endpoint;
-        
+
     private:
         std::vector<std::pair<boost::regex, Endpoint*> > opt_endpoint;
-        
+
     public:
         void start() {
             opt_endpoint.clear();
             for(auto& endp: endpoint) {
                 opt_endpoint.emplace_back(boost::regex(endp.first), &endp.second);
             }
-            
+
             if(io_service.stopped())
                 io_service.reset();
-            
+
             boost::asio::ip::tcp::endpoint endpoint;
             if(config.address.size()>0)
                 endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(config.address), config.port);
@@ -195,9 +195,9 @@ namespace SimpleWeb {
             acceptor.set_option(boost::asio::socket_base::reuse_address(config.reuse_address));
             acceptor.bind(endpoint);
             acceptor.listen();
-            
+
             accept();
-            
+
             //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
             threads.clear();
             for(size_t c=1;c<config.num_threads;c++) {
@@ -214,23 +214,23 @@ namespace SimpleWeb {
                 t.join();
             }
         }
-        
+
         void stop() {
             acceptor.close();
             io_service.stop();
-            
+
             for(auto& p: endpoint)
                 p.second.connections.clear();
         }
-        
+
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
         ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-        void send(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> message_stream, 
-                const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
+        void send(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> message_stream,
+                const std::function<void(const boost::system::error_code&)>& callback=nullptr,
                 unsigned char fin_rsv_opcode=129) const {
             if(fin_rsv_opcode!=136)
                 timer_idle_reset(connection);
-            
+
             auto header_stream=std::make_shared<SendStream>();
 
             size_t length=message_stream->size();
@@ -247,7 +247,7 @@ namespace SimpleWeb {
                     num_bytes=2;
                     header_stream->put(126);
                 }
-                
+
                 for(int c=num_bytes-1;c>=0;c--) {
                     header_stream->put((length>>(8*c))%256);
                 }
@@ -269,18 +269,18 @@ namespace SimpleWeb {
                 return;
             }
             connection->closed.store(true);
-            
+
             auto send_stream=std::make_shared<SendStream>();
-            
+
             send_stream->put(status>>8);
             send_stream->put(status%256);
-            
+
             *send_stream << reason;
 
             //fin_rsv_opcode=136: message close
             send(connection, send_stream, callback, 136);
         }
-        
+
         std::set<std::shared_ptr<Connection> > get_connections() {
             std::set<std::shared_ptr<Connection> > all_connections;
             for(auto& e: endpoint) {
@@ -290,24 +290,24 @@ namespace SimpleWeb {
             }
             return all_connections;
         }
-        
+
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-                
+
         boost::asio::io_service io_service;
         boost::asio::ip::tcp::acceptor acceptor;
-        
+
         std::vector<std::thread> threads;
-        
+
         size_t timeout_request;
         size_t timeout_idle;
-        
-        SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
+
+        SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) :
                 config(port, num_threads), acceptor(io_service),
                 timeout_request(timeout_request), timeout_idle(timeout_idle) {}
-        
+
         virtual void accept()=0;
-        
+
         std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
             std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(io_service));
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
@@ -322,7 +322,7 @@ namespace SimpleWeb {
 
         void read_handshake(std::shared_ptr<Connection> connection) {
             connection->read_remote_endpoint_data();
-            
+
             //Create new read_buffer for async_read_until()
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
@@ -331,7 +331,7 @@ namespace SimpleWeb {
             std::shared_ptr<boost::asio::deadline_timer> timer;
             if(timeout_request>0)
                 timer=set_timeout_on_connection(connection, timeout_request);
-            
+
             boost::asio::async_read_until(*connection->socket, *read_buffer, "\r\n\r\n",
                     [this, connection, read_buffer, timer]
                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
@@ -342,12 +342,12 @@ namespace SimpleWeb {
                     std::istream stream(read_buffer.get());
 
                     parse_handshake(connection, stream);
-                    
+
                     write_handshake(connection, read_buffer);
                 }
             });
         }
-        
+
         void parse_handshake(std::shared_ptr<Connection> connection, std::istream& stream) const {
             std::string line;
             getline(stream, line);
@@ -361,7 +361,7 @@ namespace SimpleWeb {
                         connection->http_version=line.substr(path_end+6, line.size()-(path_end+6)-1);
                     else
                         connection->http_version="1.1";
-            
+
                     getline(stream, line);
                     size_t param_end;
                     while((param_end=line.find(':'))!=std::string::npos) {
@@ -372,13 +372,13 @@ namespace SimpleWeb {
                             if(value_start<line.size())
                                 connection->header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size()-value_start-1)));
                         }
-            
+
                         getline(stream, line);
                     }
                 }
             }
         }
-        
+
         void write_handshake(std::shared_ptr<Connection> connection, std::shared_ptr<boost::asio::streambuf> read_buffer) {
             //Find path- and method-match, and generate response
             for(auto& endp: opt_endpoint) {
@@ -390,7 +390,7 @@ namespace SimpleWeb {
                     if(generate_handshake(connection, handshake)) {
                         connection->path_match=std::move(path_match);
                         //Capture write_buffer in lambda so it is not destroyed before async_write is finished
-                        boost::asio::async_write(*connection->socket, *write_buffer, 
+                        boost::asio::async_write(*connection->socket, *write_buffer,
                                 [this, connection, write_buffer, read_buffer, &endp]
                                 (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
@@ -405,11 +405,11 @@ namespace SimpleWeb {
                 }
             }
         }
-        
+
         bool generate_handshake(std::shared_ptr<Connection> connection, std::ostream& handshake) const {
             if(connection->header.count("Sec-WebSocket-Key")==0)
                 return 0;
-            
+
             auto sha1=Crypto::SHA1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
 
             handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
@@ -417,11 +417,11 @@ namespace SimpleWeb {
             handshake << "Connection: Upgrade\r\n";
             handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
             handshake << "\r\n";
-            
+
             return 1;
         }
-        
-        void read_message(std::shared_ptr<Connection> connection, 
+
+        void read_message(std::shared_ptr<Connection> connection,
                 std::shared_ptr<boost::asio::streambuf> read_buffer, Endpoint& endpoint) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
                     [this, connection, read_buffer, &endpoint]
@@ -436,9 +436,9 @@ namespace SimpleWeb {
                     std::vector<unsigned char> first_bytes;
                     first_bytes.resize(2);
                     stream.read((char*)&first_bytes[0], 2);
-                    
+
                     unsigned char fin_rsv_opcode=first_bytes[0];
-                    
+
                     //Close connection if unmasked message from client (protocol error)
                     if(first_bytes[1]<128) {
                         const std::string reason("message from client not masked");
@@ -446,7 +446,7 @@ namespace SimpleWeb {
                         connection_close(connection, endpoint, 1002, reason);
                         return;
                     }
-                    
+
                     size_t length=(first_bytes[1]&127);
 
                     if(length==126) {
@@ -456,16 +456,16 @@ namespace SimpleWeb {
                                 (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
-                                
+
                                 std::vector<unsigned char> length_bytes;
                                 length_bytes.resize(2);
                                 stream.read((char*)&length_bytes[0], 2);
-                                
+
                                 size_t length=0;
                                 int num_bytes=2;
                                 for(int c=0;c<num_bytes;c++)
                                     length+=length_bytes[c]<<(8*(num_bytes-1-c));
-                                
+
                                 read_message_content(connection, read_buffer, length, endpoint, fin_rsv_opcode);
                             }
                             else
@@ -479,11 +479,11 @@ namespace SimpleWeb {
                                 (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
                                 std::istream stream(read_buffer.get());
-                                
+
                                 std::vector<unsigned char> length_bytes;
                                 length_bytes.resize(8);
                                 stream.read((char*)&length_bytes[0], 8);
-                                
+
                                 size_t length=0;
                                 int num_bytes=8;
                                 for(int c=0;c<num_bytes;c++)
@@ -502,9 +502,9 @@ namespace SimpleWeb {
                     connection_error(connection, endpoint, ec);
             });
         }
-        
-        void read_message_content(std::shared_ptr<Connection> connection, 
-                std::shared_ptr<boost::asio::streambuf> read_buffer, 
+
+        void read_message_content(std::shared_ptr<Connection> connection,
+                std::shared_ptr<boost::asio::streambuf> read_buffer,
                 size_t length, Endpoint& endpoint, unsigned char fin_rsv_opcode) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(4+length),
                     [this, connection, read_buffer, length, &endpoint, fin_rsv_opcode]
@@ -516,16 +516,16 @@ namespace SimpleWeb {
                     std::vector<unsigned char> mask;
                     mask.resize(4);
                     raw_message_data.read((char*)&mask[0], 4);
-                    
+
                     std::shared_ptr<Message> message(new Message());
                     message->length=length;
                     message->fin_rsv_opcode=fin_rsv_opcode;
-                    
+
                     std::ostream message_data_out_stream(&message->streambuf);
                     for(size_t c=0;c<length;c++) {
                         message_data_out_stream.put(raw_message_data.get()^mask[c%4]);
                     }
-                    
+
                     //If connection close
                     if((fin_rsv_opcode&0x0f)==8) {
                         int status=0;
@@ -534,7 +534,7 @@ namespace SimpleWeb {
                             unsigned char byte2=message->get();
                             status=(byte1<<8)+byte2;
                         }
-                        
+
                         auto reason=message->string();
                         send_close(connection, status, reason, [this, connection](const boost::system::error_code& /*ec*/) {});
                         connection_close(connection, endpoint, status, reason);
@@ -551,7 +551,7 @@ namespace SimpleWeb {
                             timer_idle_reset(connection);
                             endpoint.onmessage(connection, message);
                         }
-    
+
                         //Next message
                         read_message(connection, read_buffer, endpoint);
                     }
@@ -560,42 +560,42 @@ namespace SimpleWeb {
                     connection_error(connection, endpoint, ec);
             });
         }
-        
+
         void connection_open(std::shared_ptr<Connection> connection, Endpoint& endpoint) {
             timer_idle_init(connection);
-            
+
             endpoint.connections_mutex.lock();
             endpoint.connections.insert(connection);
             endpoint.connections_mutex.unlock();
-            
+
             if(endpoint.onopen)
                 endpoint.onopen(connection);
         }
-        
+
         void connection_close(std::shared_ptr<Connection> connection, Endpoint& endpoint, int status, const std::string& reason) const {
             timer_idle_cancel(connection);
-            
-            endpoint.connections_mutex.lock();
-            endpoint.connections.erase(connection);
-            endpoint.connections_mutex.unlock();    
-            
-            if(endpoint.onclose)
-                endpoint.onclose(connection, status, reason);
-        }
-        
-        void connection_error(std::shared_ptr<Connection> connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
-            timer_idle_cancel(connection);
-            
+
             endpoint.connections_mutex.lock();
             endpoint.connections.erase(connection);
             endpoint.connections_mutex.unlock();
-            
+
+            if(endpoint.onclose)
+                endpoint.onclose(connection, status, reason);
+        }
+
+        void connection_error(std::shared_ptr<Connection> connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
+            timer_idle_cancel(connection);
+
+            endpoint.connections_mutex.lock();
+            endpoint.connections.erase(connection);
+            endpoint.connections_mutex.unlock();
+
             if(endpoint.onerror) {
                 boost::system::error_code ec_tmp=ec;
                 endpoint.onerror(connection, ec_tmp);
             }
         }
-        
+
         void timer_idle_init(std::shared_ptr<Connection> connection) {
             if(timeout_idle>0) {
                 connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(io_service));
@@ -612,7 +612,7 @@ namespace SimpleWeb {
             if(timeout_idle>0)
                 connection->timer_idle->cancel();
         }
-        
+
         void timer_idle_expired_function(std::shared_ptr<Connection> connection) const {
             connection->timer_idle->async_wait([this, connection](const boost::system::error_code& ec){
                 if(!ec) {
@@ -622,29 +622,34 @@ namespace SimpleWeb {
             });
         }
     };
-    
+
     template<class socket_type>
     class SocketServer : public SocketServerBase<socket_type> {};
-    
+
     typedef boost::asio::ip::tcp::socket WS;
-    
+
     template<>
     class SocketServer<WS> : public SocketServerBase<WS> {
     public:
-        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
+        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) :
                 SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle) {};
-        
+
     private:
         void accept() {
             //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
             std::shared_ptr<Connection> connection(new Connection(new WS(io_service)));
-            
+
             acceptor.async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
                 //Immediately start accepting a new connection
                 accept();
                 if(!ec) {
-                    read_handshake(connection);
+                    boost::asio::ip::tcp::no_delay option(true);
+                    boost::system::error_code ec;
+                    connection->socket->set_option(option, ec);
+                    if (!ec) {
+                      read_handshake(connection);
+                    }
                 }
             });
         }

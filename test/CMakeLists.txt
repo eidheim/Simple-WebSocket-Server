@@ -4,6 +4,12 @@ add_executable(crypto_test crypto_test.cpp)
 target_link_libraries(crypto_test ${OPENSSL_CRYPTO_LIBRARY})
 add_test(crypto_test crypto_test)
 
+add_executable(tcp_nodelay_ws tcp_nodelay_ws.cpp)
+target_link_libraries(tcp_nodelay_ws ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(tcp_nodelay_ws ${Boost_LIBRARIES})
+target_link_libraries(tcp_nodelay_ws ${CMAKE_THREAD_LIBS_INIT})
+add_test(tcp_nodelay_ws tcp_nodelay_ws)
+
 add_executable(parse_test parse_test.cpp)
 target_link_libraries(parse_test ${Boost_LIBRARIES})
 target_link_libraries(parse_test ${CMAKE_THREAD_LIBS_INIT})
