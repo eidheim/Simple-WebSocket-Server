@@ -36,6 +36,9 @@ namespace SimpleWeb {
                 accept();
 
                 if(!ec) {
+                    boost::asio::ip::tcp::no_delay option(true);
+                    connection->socket->lowest_layer().set_option(option);
+                    
                     //Set timeout on the following boost::asio::ssl::stream::async_handshake
                     std::shared_ptr<boost::asio::deadline_timer> timer;
                     if(timeout_request>0)

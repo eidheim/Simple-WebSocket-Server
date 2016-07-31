@@ -44,6 +44,9 @@ namespace SimpleWeb {
                     boost::asio::async_connect(connection->socket->lowest_layer(), it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator /*it*/){
                         if(!ec) {
+                            boost::asio::ip::tcp::no_delay option(true);
+                            connection->socket->lowest_layer().set_option(option);
+                            
                             connection->socket->async_handshake(boost::asio::ssl::stream_base::client, 
                                     [this](const boost::system::error_code& ec) {
                                 if(!ec)

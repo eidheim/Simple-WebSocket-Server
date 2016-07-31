@@ -458,6 +458,9 @@ namespace SimpleWeb {
                     boost::asio::async_connect(*connection->socket, it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator /*it*/){
                         if(!ec) {
+                            boost::asio::ip::tcp::no_delay option(true);
+                            connection->socket->set_option(option);
+                            
                             handshake();
                         }
                         else

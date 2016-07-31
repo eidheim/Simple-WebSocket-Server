@@ -644,6 +644,9 @@ namespace SimpleWeb {
                 //Immediately start accepting a new connection
                 accept();
                 if(!ec) {
+                    boost::asio::ip::tcp::no_delay option(true);
+                    connection->socket->set_option(option);
+                    
                     read_handshake(connection);
                 }
             });
