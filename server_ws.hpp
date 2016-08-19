@@ -632,7 +632,7 @@ namespace SimpleWeb {
         SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
                 SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle) {};
         
-    private:
+    protected:
         void accept() {
             //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
