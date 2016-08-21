@@ -30,7 +30,7 @@ namespace SimpleWeb {
 
         };
 
-    private:
+    protected:
         boost::asio::ssl::context context;
         
         void connect() {

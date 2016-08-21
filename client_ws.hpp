@@ -446,7 +446,7 @@ namespace SimpleWeb {
     public:
         SocketClient(const std::string& server_port_path) : SocketClientBase<WS>::SocketClientBase(server_port_path, 80) {};
         
-    private:
+    protected:
         void connect() {
             boost::asio::ip::tcp::resolver::query query(host, std::to_string(port));
             
