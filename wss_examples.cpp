@@ -59,9 +59,9 @@ int main() {
     //Example 2: Echo thrice
     //  Send a received message three times back to the client
     //  Test with the following JavaScript:
-    //    var ws=new WebSocket("wss://localhost:8080/echo_thrice");
-    //    ws.onmessage=function(evt){console.log(evt.data);};
-    //    ws.send("test");
+    //    var wss=new WebSocket("wss://localhost:8080/echo_thrice");
+    //    wss.onmessage=function(evt){console.log(evt.data);};
+    //    wss.send("test");
     auto& echo_thrice=server.endpoint["^/echo_thrice/?$"];
     echo_thrice.onmessage=[&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
         auto message_str=message->string();

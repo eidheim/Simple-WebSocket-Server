@@ -15,7 +15,7 @@ namespace SimpleWeb {
                 size_t timeout_request=5, size_t timeout_idle=0, 
                 const std::string& verify_file=std::string()) : 
                 SocketServerBase<WSS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle), 
-                context(boost::asio::ssl::context::sslv23) {
+                context(boost::asio::ssl::context::tlsv12) {
             context.use_certificate_chain_file(cert_file);
             context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             
