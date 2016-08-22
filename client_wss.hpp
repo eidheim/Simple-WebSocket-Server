@@ -14,7 +14,7 @@ namespace SimpleWeb {
                 const std::string& cert_file=std::string(), const std::string& private_key_file=std::string(), 
                 const std::string& verify_file=std::string()) : 
                 SocketClientBase<WSS>::SocketClientBase(server_port_path, 443),
-                context(boost::asio::ssl::context::sslv23) {
+                context(boost::asio::ssl::context::tlsv12) {
             if(verify_certificate)
                 context.set_verify_mode(boost::asio::ssl::verify_peer);
             else
