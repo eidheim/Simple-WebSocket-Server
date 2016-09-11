@@ -249,7 +249,7 @@ namespace SimpleWeb {
                 }
                 
                 for(int c=num_bytes-1;c>=0;c--) {
-                    header_stream->put((length>>(8*c))%256);
+                  header_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
                 }
             }
             else
