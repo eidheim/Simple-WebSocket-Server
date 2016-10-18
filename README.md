@@ -31,7 +31,9 @@ See ws_examples.cpp or wss_examples.cpp for example usage.
 Compile with a C++11 supported compiler:
 
 ```sh
-cmake .
+mkdir build
+cd build
+cmake ..
 make
 ```
 
@@ -40,7 +42,8 @@ make
 ### WS
 
 ```sh
-./ws_examples
+cd ..
+./build/ws_examples
 ```
 
 ### WSS
