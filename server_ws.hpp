@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <thread>
 #include <mutex>
-#include <set>
+#include <unordered_set>
 #include <list>
 #include <memory>
 #include <atomic>
@@ -138,7 +138,7 @@ namespace SimpleWeb {
         class Endpoint {
             friend class SocketServerBase<socket_type>;
         private:
-            std::set<std::shared_ptr<Connection> > connections;
+            std::unordered_set<std::shared_ptr<Connection> > connections;
             std::mutex connections_mutex;
 
         public:            
@@ -147,7 +147,7 @@ namespace SimpleWeb {
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
             
-            std::set<std::shared_ptr<Connection> > get_connections() {
+            std::unordered_set<std::shared_ptr<Connection> > get_connections() {
                 connections_mutex.lock();
                 auto copy=connections;
                 connections_mutex.unlock();
@@ -281,8 +281,8 @@ namespace SimpleWeb {
             send(connection, send_stream, callback, 136);
         }
         
-        std::set<std::shared_ptr<Connection> > get_connections() {
-            std::set<std::shared_ptr<Connection> > all_connections;
+        std::unordered_set<std::shared_ptr<Connection> > get_connections() {
+            std::unordered_set<std::shared_ptr<Connection> > all_connections;
             for(auto& e: endpoint) {
                 e.second.connections_mutex.lock();
                 all_connections.insert(e.second.connections.begin(), e.second.connections.end());

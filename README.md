@@ -35,6 +35,7 @@ mkdir build
 cd build
 cmake ..
 make
+cd ..
 ```
 
 #### Run server and client examples
@@ -42,7 +43,6 @@ make
 ### WS
 
 ```sh
-cd ..
 ./build/ws_examples
 ```
 
@@ -52,5 +52,5 @@ Before running the WSS-examples, an RSA private key (server.key) and an SSL cert
 
 Then:
 ```
-./wss_examples
+./build/wss_examples
 ```
