@@ -56,7 +56,7 @@ namespace SimpleWeb {
             
             class SendData {
             public:
-                SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
+                SendData(const std::shared_ptr<SendStream> &header_stream, const std::shared_ptr<SendStream> &message_stream,
                         const std::function<void(const boost::system::error_code)> &callback) :
                         header_stream(header_stream), message_stream(message_stream), callback(callback) {}
                 std::shared_ptr<SendStream> header_stream;
@@ -71,7 +71,7 @@ namespace SimpleWeb {
             
             std::list<SendData> send_queue;
             
-            void send_from_queue(std::shared_ptr<Connection> connection) {
+            void send_from_queue(const std::shared_ptr<Connection> &connection) {
                 strand.post([this, connection]() {
                     boost::asio::async_write(*socket, send_queue.begin()->header_stream->streambuf,
                             strand.wrap([this, connection](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
@@ -232,7 +232,7 @@ namespace SimpleWeb {
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
         ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-        void send(std::shared_ptr<Connection> connection, std::shared_ptr<SendStream> message_stream, 
+        void send(const std::shared_ptr<Connection> &connection, const std::shared_ptr<SendStream> &message_stream, 
                 const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
                 unsigned char fin_rsv_opcode=129) const {
             if(fin_rsv_opcode!=136)
@@ -269,7 +269,7 @@ namespace SimpleWeb {
             });
         }
 
-        void send_close(std::shared_ptr<Connection> connection, int status, const std::string& reason="",
+        void send_close(const std::shared_ptr<Connection> &connection, int status, const std::string& reason="",
                 const std::function<void(const boost::system::error_code&)>& callback=nullptr) const {
             //Send close only once (in case close is initiated by server)
             if(connection->closed.load()) {
@@ -316,7 +316,7 @@ namespace SimpleWeb {
         
         virtual void accept()=0;
         
-        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
+        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(const std::shared_ptr<Connection> &connection, size_t seconds) {
             std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(*io_service));
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
@@ -328,7 +328,7 @@ namespace SimpleWeb {
             return timer;
         }
 
-        void read_handshake(std::shared_ptr<Connection> connection) {
+        void read_handshake(const std::shared_ptr<Connection> &connection) {
             connection->read_remote_endpoint_data();
             
             //Create new read_buffer for async_read_until()
@@ -356,7 +356,7 @@ namespace SimpleWeb {
             });
         }
         
-        void parse_handshake(std::shared_ptr<Connection> connection, std::istream& stream) const {
+        void parse_handshake(const std::shared_ptr<Connection> &connection, std::istream& stream) const {
             std::string line;
             getline(stream, line);
             size_t method_end;
@@ -387,7 +387,7 @@ namespace SimpleWeb {
             }
         }
         
-        void write_handshake(std::shared_ptr<Connection> connection, std::shared_ptr<boost::asio::streambuf> read_buffer) {
+        void write_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer) {
             //Find path- and method-match, and generate response
             for(auto& endp: opt_endpoint) {
                 boost::smatch path_match;
@@ -414,7 +414,7 @@ namespace SimpleWeb {
             }
         }
         
-        bool generate_handshake(std::shared_ptr<Connection> connection, std::ostream& handshake) const {
+        bool generate_handshake(const std::shared_ptr<Connection> &connection, std::ostream& handshake) const {
             if(connection->header.count("Sec-WebSocket-Key")==0)
                 return 0;
             
@@ -429,8 +429,8 @@ namespace SimpleWeb {
             return 1;
         }
         
-        void read_message(std::shared_ptr<Connection> connection, 
-                std::shared_ptr<boost::asio::streambuf> read_buffer, Endpoint& endpoint) const {
+        void read_message(const std::shared_ptr<Connection> &connection,
+                          const std::shared_ptr<boost::asio::streambuf> &read_buffer, Endpoint& endpoint) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(2),
                     [this, connection, read_buffer, &endpoint]
                     (const boost::system::error_code& ec, size_t bytes_transferred) {
@@ -511,9 +511,8 @@ namespace SimpleWeb {
             });
         }
         
-        void read_message_content(std::shared_ptr<Connection> connection, 
-                std::shared_ptr<boost::asio::streambuf> read_buffer, 
-                size_t length, Endpoint& endpoint, unsigned char fin_rsv_opcode) const {
+        void read_message_content(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer,
+                                  size_t length, Endpoint& endpoint, unsigned char fin_rsv_opcode) const {
             boost::asio::async_read(*connection->socket, *read_buffer, boost::asio::transfer_exactly(4+length),
                     [this, connection, read_buffer, length, &endpoint, fin_rsv_opcode]
                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
@@ -569,7 +568,7 @@ namespace SimpleWeb {
             });
         }
         
-        void connection_open(std::shared_ptr<Connection> connection, Endpoint& endpoint) {
+        void connection_open(const std::shared_ptr<Connection> &connection, Endpoint& endpoint) {
             timer_idle_init(connection);
             
             endpoint.connections_mutex.lock();
@@ -580,7 +579,7 @@ namespace SimpleWeb {
                 endpoint.onopen(connection);
         }
         
-        void connection_close(std::shared_ptr<Connection> connection, Endpoint& endpoint, int status, const std::string& reason) const {
+        void connection_close(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, int status, const std::string& reason) const {
             timer_idle_cancel(connection);
             
             endpoint.connections_mutex.lock();
@@ -591,7 +590,7 @@ namespace SimpleWeb {
                 endpoint.onclose(connection, status, reason);
         }
         
-        void connection_error(std::shared_ptr<Connection> connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
+        void connection_error(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
             timer_idle_cancel(connection);
             
             endpoint.connections_mutex.lock();
@@ -604,24 +603,24 @@ namespace SimpleWeb {
             }
         }
         
-        void timer_idle_init(std::shared_ptr<Connection> connection) {
+        void timer_idle_init(const std::shared_ptr<Connection> &connection) {
             if(timeout_idle>0) {
                 connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(*io_service));
                 connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)));
                 timer_idle_expired_function(connection);
             }
         }
-        void timer_idle_reset(std::shared_ptr<Connection> connection) const {
+        void timer_idle_reset(const std::shared_ptr<Connection> &connection) const {
             if(timeout_idle>0 && connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)))>0) {
                 timer_idle_expired_function(connection);
             }
         }
-        void timer_idle_cancel(std::shared_ptr<Connection> connection) const {
+        void timer_idle_cancel(const std::shared_ptr<Connection> &connection) const {
             if(timeout_idle>0)
                 connection->timer_idle->cancel();
         }
         
-        void timer_idle_expired_function(std::shared_ptr<Connection> connection) const {
+        void timer_idle_expired_function(const std::shared_ptr<Connection> &connection) const {
             connection->timer_idle->async_wait([this, connection](const boost::system::error_code& ec){
                 if(!ec) {
                     //1000=normal closure

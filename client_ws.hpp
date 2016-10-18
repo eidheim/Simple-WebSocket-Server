@@ -45,7 +45,7 @@ namespace SimpleWeb {
             
             class SendData {
             public:
-                SendData(std::shared_ptr<SendStream> send_stream, const std::function<void(const boost::system::error_code)> &callback) :
+                SendData(const std::shared_ptr<SendStream> &send_stream, const std::function<void(const boost::system::error_code)> &callback) :
                         send_stream(send_stream), callback(callback) {}
                 std::shared_ptr<SendStream> send_stream;
                 std::function<void(const boost::system::error_code)> callback;
@@ -137,8 +137,8 @@ namespace SimpleWeb {
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
         ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-        void send(std::shared_ptr<SendStream> message_stream, const std::function<void(const boost::system::error_code&)>& callback=nullptr, 
-                        unsigned char fin_rsv_opcode=129) {
+        void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const boost::system::error_code&)>& callback=nullptr,
+                  unsigned char fin_rsv_opcode=129) {
             //Create mask
             std::vector<unsigned char> mask;
             mask.resize(4);
@@ -318,7 +318,7 @@ namespace SimpleWeb {
             }
         }
         
-        void read_message(std::shared_ptr<Message> message) {
+        void read_message(const std::shared_ptr<Message> &message) {
             boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(2),
                     [this, message](const boost::system::error_code& ec, size_t bytes_transferred) {
                 if(!ec) {
@@ -404,7 +404,7 @@ namespace SimpleWeb {
             });
         }
         
-        void read_message_content(std::shared_ptr<Message> message) {
+        void read_message_content(const std::shared_ptr<Message> &message) {
             boost::asio::async_read(*connection->socket, message->streambuf, boost::asio::transfer_exactly(message->length), 
                     [this, message]
                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
