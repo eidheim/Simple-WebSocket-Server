@@ -7,8 +7,8 @@ typedef SimpleWeb::SocketServer<SimpleWeb::WS> WsServer;
 typedef SimpleWeb::SocketClient<SimpleWeb::WS> WsClient;
 
 int main() {
-    //WebSocket (WS)-server at port 8080 using 4 threads
-    WsServer server(8080, 4);
+    //WebSocket (WS)-server at port 8080 using 1 thread
+    WsServer server(8080, 1);
     
     //Example 1: echo WebSocket endpoint
     //  Added debug messages for example use of the callbacks

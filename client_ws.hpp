@@ -115,13 +115,24 @@ namespace SimpleWeb {
         std::function<void(int, const std::string&)> onclose;
         
         void start() {
+            if(!io_service)
+                io_service=std::make_shared<boost::asio::io_service>();
+            else
+                external_io_service=true;
+            
+            if(!resolver)
+                resolver=std::unique_ptr<boost::asio::ip::tcp::resolver>(new boost::asio::ip::tcp::resolver(*io_service));
+            
             connect();
             
-            io_service.run();
+            if(!external_io_service)
+                io_service->run();
         }
         
         void stop() {
-            io_service.stop();
+            resolver->cancel();
+            if(!external_io_service)
+                io_service->stop();
         }
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
@@ -194,19 +205,19 @@ namespace SimpleWeb {
             send(send_stream, callback, 136);
         }
         
+        /// If you have your own boost::asio::io_service, store its pointer here before running start().
+        std::shared_ptr<boost::asio::io_service> io_service;
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         
-        boost::asio::io_service io_service;
-        boost::asio::ip::tcp::endpoint endpoint;
-        boost::asio::ip::tcp::resolver resolver;
+        bool external_io_service=false;
+        std::unique_ptr<boost::asio::ip::tcp::resolver> resolver;
         
         std::string host;
         unsigned short port;
         std::string path;
                 
-        SocketClientBase(const std::string& host_port_path, unsigned short default_port) : 
-                resolver(io_service) {
+        SocketClientBase(const std::string& host_port_path, unsigned short default_port) {
             size_t host_end=host_port_path.find(':');
             size_t host_port_end=host_port_path.find('/');
             if(host_end==std::string::npos) {
@@ -450,10 +461,10 @@ namespace SimpleWeb {
         void connect() {
             boost::asio::ip::tcp::resolver::query query(host, std::to_string(port));
             
-            resolver.async_resolve(query, [this]
+            resolver->async_resolve(query, [this]
                     (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator it){
                 if(!ec) {
-                    connection=std::shared_ptr<Connection>(new Connection(new WS(io_service)));
+                    connection=std::shared_ptr<Connection>(new Connection(new WS(*io_service)));
 
                     boost::asio::async_connect(*connection->socket, it, [this]
                             (const boost::system::error_code &ec, boost::asio::ip::tcp::resolver::iterator /*it*/){

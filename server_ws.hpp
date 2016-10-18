@@ -183,18 +183,24 @@ namespace SimpleWeb {
                 opt_endpoint.emplace_back(boost::regex(endp.first), &endp.second);
             }
             
-            if(io_service.stopped())
-                io_service.reset();
+            if(!io_service)
+                io_service=std::make_shared<boost::asio::io_service>();
+            
+            if(io_service->stopped())
+                io_service->reset();
             
             boost::asio::ip::tcp::endpoint endpoint;
             if(config.address.size()>0)
                 endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(config.address), config.port);
             else
                 endpoint=boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), config.port);
-            acceptor.open(endpoint.protocol());
-            acceptor.set_option(boost::asio::socket_base::reuse_address(config.reuse_address));
-            acceptor.bind(endpoint);
-            acceptor.listen();
+            
+            if(!acceptor)
+                acceptor=std::unique_ptr<boost::asio::ip::tcp::acceptor>(new boost::asio::ip::tcp::acceptor(*io_service));
+            acceptor->open(endpoint.protocol());
+            acceptor->set_option(boost::asio::socket_base::reuse_address(config.reuse_address));
+            acceptor->bind(endpoint);
+            acceptor->listen();
             
             accept();
             
@@ -202,12 +208,12 @@ namespace SimpleWeb {
             threads.clear();
             for(size_t c=1;c<config.num_threads;c++) {
                 threads.emplace_back([this](){
-                    io_service.run();
+                    io_service->run();
                 });
             }
-
             //Main thread
-            io_service.run();
+            if(config.num_threads>0)
+                io_service->run();
 
             //Wait for the rest of the threads, if any, to finish as well
             for(auto& t: threads) {
@@ -216,8 +222,9 @@ namespace SimpleWeb {
         }
         
         void stop() {
-            acceptor.close();
-            io_service.stop();
+            acceptor->close();
+            if(config.num_threads>0)
+                io_service->stop();
             
             for(auto& p: endpoint)
                 p.second.connections.clear();
@@ -291,11 +298,13 @@ namespace SimpleWeb {
             return all_connections;
         }
         
+        /// If you have your own boost::asio::io_service, store its pointer here before running start().
+        /// You might also want to set config.num_threads to 0.
+        std::shared_ptr<boost::asio::io_service> io_service;
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-                
-        boost::asio::io_service io_service;
-        boost::asio::ip::tcp::acceptor acceptor;
+        
+        std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor;
         
         std::vector<std::thread> threads;
         
@@ -303,13 +312,12 @@ namespace SimpleWeb {
         size_t timeout_idle;
         
         SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
-                config(port, num_threads), acceptor(io_service),
-                timeout_request(timeout_request), timeout_idle(timeout_idle) {}
+                config(port, num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle) {}
         
         virtual void accept()=0;
         
         std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(std::shared_ptr<Connection> connection, size_t seconds) {
-            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(io_service));
+            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(*io_service));
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
@@ -598,7 +606,7 @@ namespace SimpleWeb {
         
         void timer_idle_init(std::shared_ptr<Connection> connection) {
             if(timeout_idle>0) {
-                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(io_service));
+                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(*io_service));
                 connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)));
                 timer_idle_expired_function(connection);
             }
@@ -638,9 +646,9 @@ namespace SimpleWeb {
         void accept() {
             //Create new socket for this connection (stored in Connection::socket)
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<Connection> connection(new Connection(new WS(io_service)));
+            std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
             
-            acceptor.async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
+            acceptor->async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
                 //Immediately start accepting a new connection
                 accept();
                 if(!ec) {

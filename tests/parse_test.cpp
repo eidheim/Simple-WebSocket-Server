@@ -13,7 +13,7 @@ public:
     void accept() {}
     
     bool parse_request_test() {
-        std::shared_ptr<Connection> connection(new Connection(new WS(io_service)));
+        std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
         
         stringstream ss;
         ss << "GET /test/ HTTP/1.1\r\n";
@@ -97,7 +97,7 @@ public:
     }
     
     bool parse_response_header_test() {
-        connection=std::unique_ptr<Connection>(new Connection(new WS(io_service)));
+        connection=std::unique_ptr<Connection>(new Connection(new WS(*io_service)));
         
         stringstream ss;
         ss << "HTTP/1.1 200 OK\r\n";
@@ -126,6 +126,8 @@ public:
 
 int main() {
     SocketServerTest serverTest;
+    serverTest.io_service=std::make_shared<boost::asio::io_service>();
+    
     if(!serverTest.parse_request_test()) {
         cerr << "FAIL SocketServer::parse_request" << endl;
         return 1;
@@ -150,6 +152,7 @@ int main() {
     }
     
     SocketClientTest clientTest4("test.org:8080");
+    clientTest4.io_service=std::make_shared<boost::asio::io_service>();
     if(!clientTest4.constructor_parse_test4()) {
         cerr << "FAIL SocketClient::SocketClient" << endl;
         return 1;
