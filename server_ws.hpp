@@ -7,15 +7,22 @@
 #include <boost/asio/spawn.hpp>
 
 #include <unordered_map>
-#include <regex>
 #include <thread>
 #include <mutex>
 #include <unordered_set>
 #include <list>
 #include <memory>
 #include <atomic>
-
 #include <iostream>
+
+// Late 2017 TODO: remove the following checks and always use std::regex
+#ifdef USE_BOOST_REGEX
+#include <boost/regex.hpp>
+#define REGEX_NS boost
+#else
+#include <regex>
+#define REGEX_NS std
+#endif
 
 namespace SimpleWeb {
     template <class socket_type>
@@ -46,7 +53,7 @@ namespace SimpleWeb {
 
             std::unordered_map<std::string, std::string> header;
 
-            std::smatch path_match;
+            REGEX_NS::smatch path_match;
             
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
@@ -174,13 +181,13 @@ namespace SimpleWeb {
         std::map<std::string, Endpoint> endpoint;
         
     private:
-        std::vector<std::pair<std::regex, Endpoint*> > opt_endpoint;
+        std::vector<std::pair<REGEX_NS::regex, Endpoint*> > opt_endpoint;
         
     public:
         void start() {
             opt_endpoint.clear();
             for(auto& endp: endpoint) {
-                opt_endpoint.emplace_back(std::regex(endp.first), &endp.second);
+                opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
             }
             
             if(!io_service)
@@ -390,8 +397,8 @@ namespace SimpleWeb {
         void write_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer) {
             //Find path- and method-match, and generate response
             for(auto& endp: opt_endpoint) {
-                std::smatch path_match;
-                if(std::regex_match(connection->path, path_match, endp.first)) {
+                REGEX_NS::smatch path_match;
+                if(REGEX_NS::regex_match(connection->path, path_match, endp.first)) {
                     std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
                     std::ostream handshake(write_buffer.get());
 

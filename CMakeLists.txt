@@ -2,9 +2,16 @@ cmake_minimum_required (VERSION 2.8)
 project (Simple-WebSocket-Server)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra")
 
-#Only tested with versions 1.55 and 1.56
-find_package(Boost 1.54.0 COMPONENTS system coroutine context thread REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
+set(BOOST_COMPONENTS system coroutine context thread)
+# Late 2017 TODO: remove the following checks and always use std::regex
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
+        set(BOOST_COMPONENTS ${BOOST_COMPONENTS} regex)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_BOOST_REGEX")
+    endif()
+endif()
+find_package(Boost 1.54.0 COMPONENTS ${BOOST_COMPONENTS} REQUIRED)
+include_directories(SYSTEM ${Boost_INCLUDE_DIR})
 
 if(APPLE)
   set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
