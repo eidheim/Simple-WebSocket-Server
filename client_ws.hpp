@@ -115,10 +115,10 @@ namespace SimpleWeb {
         std::function<void(int, const std::string&)> onclose;
         
         void start() {
-            if(!io_service)
+            if(!io_service) {
                 io_service=std::make_shared<boost::asio::io_service>();
-            else
-                external_io_service=true;
+                internal_io_service=true;
+            }
             
             if(io_service->stopped())
                 io_service->reset();
@@ -128,13 +128,13 @@ namespace SimpleWeb {
             
             connect();
             
-            if(!external_io_service)
+            if(internal_io_service)
                 io_service->run();
         }
         
         void stop() {
             resolver->cancel();
-            if(!external_io_service)
+            if(internal_io_service)
                 io_service->stop();
         }
         
@@ -213,7 +213,7 @@ namespace SimpleWeb {
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         
-        bool external_io_service=false;
+        bool internal_io_service=false;
         std::unique_ptr<boost::asio::ip::tcp::resolver> resolver;
         
         std::string host;
