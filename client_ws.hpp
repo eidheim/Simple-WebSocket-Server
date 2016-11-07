@@ -120,6 +120,9 @@ namespace SimpleWeb {
             else
                 external_io_service=true;
             
+            if(io_service->stopped())
+                io_service->reset();
+            
             if(!resolver)
                 resolver=std::unique_ptr<boost::asio::ip::tcp::resolver>(new boost::asio::ip::tcp::resolver(*io_service));
             
