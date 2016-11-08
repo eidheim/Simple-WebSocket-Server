@@ -669,8 +669,10 @@ namespace SimpleWeb {
             std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
             
             acceptor->async_accept(*connection->socket, [this, connection](const boost::system::error_code& ec) {
-                //Immediately start accepting a new connection
-                accept();
+                //Immediately start accepting a new connection (if io_service hasn't been stopped)
+                if (ec != boost::asio::error::operation_aborted)
+                    accept();
+
                 if(!ec) {
                     boost::asio::ip::tcp::no_delay option(true);
                     connection->socket->set_option(option);
