@@ -11,6 +11,12 @@
 #include <openssl/md5.h>
 
 namespace SimpleWeb {
+    #if _MSC_VER == 1700 //MSVS 2012 has no definition for round()
+        double round(double x) { //custom definition of round() for positive numbers
+            return floor(x + 0.5);
+        }
+    #endif
+
     //type must support size(), resize() and operator[]
     namespace Crypto {
         namespace Base64 {
