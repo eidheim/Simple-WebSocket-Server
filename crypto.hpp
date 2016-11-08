@@ -11,6 +11,18 @@
 #include <openssl/md5.h>
 
 namespace SimpleWeb {
+    #if _MSC_VER == 1700 //MSVS 2012 has no definition for round()
+        #define ROUND_NS SimpleWeb::math
+
+        namespace math {
+            double round(double x) { //custom definition of round() for positive numbers
+                return floor(x + 0.5);
+            }
+        }
+    #else
+        #define ROUND_NS
+    #endif
+
     //type must support size(), resize() and operator[]
     namespace Crypto {
         namespace Base64 {
@@ -26,7 +38,7 @@ namespace SimpleWeb {
                 BIO_get_mem_ptr(b64, &bptr);
 
                 //Write directly to base64-buffer to avoid copy
-                int base64_length=static_cast<int>(round(4*ceil((double)ascii.size()/3.0)));
+                int base64_length=static_cast<int>(ROUND_NS::round(4*ceil((double)ascii.size()/3.0)));
                 base64.resize(base64_length);
                 bptr->length=0;
                 bptr->max=base64_length+1;
