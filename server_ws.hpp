@@ -1,5 +1,5 @@
 #ifndef SERVER_WS_HPP
-#define	SERVER_WS_HPP
+#define SERVER_WS_HPP
 
 #include "crypto.hpp"
 
@@ -146,18 +146,32 @@ namespace SimpleWeb {
             friend class SocketServerBase<socket_type>;
         private:
             std::unordered_set<std::shared_ptr<Connection> > connections;
-            std::mutex connections_mutex;
+            std::unique_ptr<std::mutex> connections_mutex;
 
         public:            
+            Endpoint() : connections_mutex(new std::mutex) {}
+            Endpoint(Endpoint&& other) : connections_mutex(std::move(other.connections_mutex)), connections(std::move(other.connections)),
+                onopen(std::move(other.onopen)), onmessage(std::move(other.onmessage)), onerror(std::move(other.onerror)), 
+                onclose(std::move(other.onclose)) {}
+
+            Endpoint& operator=(Endpoint&& other) {
+                connections_mutex = std::move(other.connections_mutex);
+                connections = std::move(other.connections);
+                onopen = std::move(other.onopen);
+                onmessage = std::move(other.onmessage);
+                onerror = std::move(other.onerror);
+                onclose = std::move(other.onclose);
+            }
+
             std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
             
             std::unordered_set<std::shared_ptr<Connection> > get_connections() {
-                connections_mutex.lock();
+                connections_mutex->lock();
                 auto copy=connections;
-                connections_mutex.unlock();
+                connections_mutex->unlock();
                 return copy;
             }
         };
@@ -309,7 +323,7 @@ namespace SimpleWeb {
         /// You might also want to set config.num_threads to 0.
         std::shared_ptr<boost::asio::io_service> io_service;
     protected:
-        const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        const std::string ws_magic_string;
         
         std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor;
         
@@ -319,7 +333,7 @@ namespace SimpleWeb {
         size_t timeout_idle;
         
         SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
-                config(port, num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle) {}
+                config(port, num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle), ws_magic_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11") {}
         
         virtual void accept()=0;
         
@@ -578,9 +592,9 @@ namespace SimpleWeb {
         void connection_open(const std::shared_ptr<Connection> &connection, Endpoint& endpoint) {
             timer_idle_init(connection);
             
-            endpoint.connections_mutex.lock();
+            endpoint.connections_mutex->lock();
             endpoint.connections.insert(connection);
-            endpoint.connections_mutex.unlock();
+            endpoint.connections_mutex->unlock();
             
             if(endpoint.onopen)
                 endpoint.onopen(connection);
@@ -589,9 +603,9 @@ namespace SimpleWeb {
         void connection_close(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, int status, const std::string& reason) const {
             timer_idle_cancel(connection);
             
-            endpoint.connections_mutex.lock();
+            endpoint.connections_mutex->lock();
             endpoint.connections.erase(connection);
-            endpoint.connections_mutex.unlock();    
+            endpoint.connections_mutex->unlock();    
             
             if(endpoint.onclose)
                 endpoint.onclose(connection, status, reason);
@@ -600,9 +614,9 @@ namespace SimpleWeb {
         void connection_error(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
             timer_idle_cancel(connection);
             
-            endpoint.connections_mutex.lock();
+            endpoint.connections_mutex->lock();
             endpoint.connections.erase(connection);
-            endpoint.connections_mutex.unlock();
+            endpoint.connections_mutex->unlock();
             
             if(endpoint.onerror) {
                 boost::system::error_code ec_tmp=ec;
@@ -669,4 +683,4 @@ namespace SimpleWeb {
         }
     };
 }
-#endif	/* SERVER_WS_HPP */
+#endif  /* SERVER_WS_HPP */
