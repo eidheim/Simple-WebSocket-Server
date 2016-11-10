@@ -8,13 +8,13 @@ script:
       apt-get update &&
       apt-get install --yes cmake make g\+\+ clang perl libssl-dev libboost-thread-dev libboost-regex-dev libboost-date-time-dev libboost-context-dev libboost-coroutine-dev &&
       cd /repository && mkdir build && cd build &&
-      scan-build cmake -DCMAKE_CXX_FLAGS=-Werror .. &&
+      scan-build cmake .. &&
       scan-build --status-bugs make &&
       rm -r * &&
-      CXX=clang++ cmake -DCMAKE_CXX_FLAGS=-Werror .. &&
+      CXX=clang++ cmake .. &&
       make &&
       rm -r * &&
-      CXX=g++ cmake -DCMAKE_CXX_FLAGS=-Werror .. &&
+      CXX=g++ cmake .. &&
       make &&
       CTEST_OUTPUT_ON_FAILURE=1 make test
       "
