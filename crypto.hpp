@@ -11,8 +11,9 @@
 #include <openssl/md5.h>
 
 namespace SimpleWeb {
+    //TODO 2017: remove workaround for MSVS 2012
     #if _MSC_VER == 1700 //MSVS 2012 has no definition for round()
-        double round(double x) { //custom definition of round() for positive numbers
+        inline double round(double x) { //custom definition of round() for positive numbers
             return floor(x + 0.5);
         }
     #endif
