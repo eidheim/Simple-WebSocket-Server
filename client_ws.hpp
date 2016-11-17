@@ -192,10 +192,9 @@ namespace SimpleWeb {
         
         void send_close(int status, const std::string& reason="", const std::function<void(const boost::system::error_code&)>& callback=nullptr) {
             //Send close only once (in case close is initiated by client)
-            if(connection->closed.load()) {
+            if(connection->closed)
                 return;
-            }
-            connection->closed.store(true);
+            connection->closed=true;
             
             auto send_stream=std::make_shared<SendStream>();
             
@@ -233,12 +232,10 @@ namespace SimpleWeb {
                 else
                     port=(unsigned short)stoul(host_port_path.substr(host_end+1, host_port_end-(host_end+1)));
             }
-            if(host_port_end==std::string::npos) {
+            if(host_port_end==std::string::npos)
                 path="/";
-            }
-            else {
+            else
                 path=host_port_path.substr(host_port_end);
-            }
             if(host_end==std::string::npos)
                 host=host_port_path;
             else
@@ -291,13 +288,15 @@ namespace SimpleWeb {
                                     onopen();
                                 read_message(message);
                             }
-                            else
-                                throw std::invalid_argument("WebSocket handshake failed");
+                            else if(onerror)
+                                onerror(boost::system::error_code(boost::system::errc::protocol_error, boost::system::generic_category()));
                         }
+                        else if(onerror)
+                            onerror(ec);
                     });
                 }
-                else
-                    throw std::invalid_argument("Failed sending handshake");
+                else if(onerror)
+                    onerror(ec);
             });
         }
         
@@ -365,10 +364,8 @@ namespace SimpleWeb {
                                 message->length=length;
                                 read_message_content(message);
                             }
-                            else {
-                                if(onerror)
-                                    onerror(ec);
-                            }
+                            else if(onerror)
+                                onerror(ec);
                         });
                     }
                     else if(length==127) {
@@ -389,10 +386,8 @@ namespace SimpleWeb {
                                 message->length=length;
                                 read_message_content(message);
                             }
-                            else {
-                                if(onerror)
-                                    onerror(ec);
-                            }
+                            else if(onerror)
+                                onerror(ec);
                         });
                     }
                     else {
@@ -400,10 +395,8 @@ namespace SimpleWeb {
                         read_message_content(message);
                     }
                 }
-                else {
-                    if(onerror)
-                        onerror(ec);
-                }
+                else if(onerror)
+                    onerror(ec);
             });
         }
         
@@ -442,10 +435,8 @@ namespace SimpleWeb {
                     std::shared_ptr<Message> next_message(new Message());
                     read_message(next_message);
                 }
-                else {
-                    if(onerror)
-                        onerror(ec);
-                }
+                else if(onerror)
+                    onerror(ec);
             });
         }
     };
@@ -477,12 +468,12 @@ namespace SimpleWeb {
                             
                             handshake();
                         }
-                        else
-                            throw std::invalid_argument(ec.message());
+                        else if(onerror)
+                            onerror(ec);
                     });
                 }
-                else
-                    throw std::invalid_argument(ec.message());
+                else if(onerror)
+                    onerror(ec);
             });
         }
     };
