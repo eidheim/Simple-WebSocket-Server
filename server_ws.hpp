@@ -320,8 +320,11 @@ namespace SimpleWeb {
         
         virtual void accept()=0;
         
-        std::shared_ptr<boost::asio::deadline_timer> set_timeout_on_connection(const std::shared_ptr<Connection> &connection, size_t seconds) {
-            std::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(*io_service));
+        std::shared_ptr<boost::asio::deadline_timer> get_timeout_timer(const std::shared_ptr<Connection> &connection, size_t seconds) {
+            if(seconds==0)
+                return nullptr;
+            
+            auto timer=std::make_shared<boost::asio::deadline_timer>(*io_service);
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
@@ -340,14 +343,12 @@ namespace SimpleWeb {
             std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
 
             //Set timeout on the following boost::asio::async-read or write function
-            std::shared_ptr<boost::asio::deadline_timer> timer;
-            if(timeout_request>0)
-                timer=set_timeout_on_connection(connection, timeout_request);
+            auto timer=get_timeout_timer(connection, timeout_request);
             
             boost::asio::async_read_until(*connection->socket, *read_buffer, "\r\n\r\n",
                     [this, connection, read_buffer, timer]
                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
-                if(timeout_request>0)
+                if(timer)
                     timer->cancel();
                 if(!ec) {
                     //Convert to istream to extract string-lines
