@@ -17,6 +17,7 @@ namespace SimpleWeb {
                 context(boost::asio::ssl::context::tlsv12) {
             if(verify_certificate) {
                 context.set_verify_mode(boost::asio::ssl::verify_peer);
+                context.set_verify_callback(boost::asio::ssl::rfc2818_verification(host));
                 context.set_default_verify_paths();
             }
             else
@@ -27,8 +28,10 @@ namespace SimpleWeb {
                 context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             }
             
-            if(verify_file.size()>0)
+            if(verify_file.size()>0) {
                 context.load_verify_file(verify_file);
+                context.set_verify_mode(boost::asio::ssl::verify_peer);
+            }
 
         };
 
