@@ -24,14 +24,14 @@ namespace SimpleWeb {
             template<class type>
             void encode(const type& ascii, type& base64) {
                 BIO *bio, *b64;
-                BUF_MEM *bptr;
+                BUF_MEM *bptr=BUF_MEM_new();
 
                 b64 = BIO_new(BIO_f_base64());
                 BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
                 bio = BIO_new(BIO_s_mem());
                 BIO_push(b64, bio);
-                BIO_get_mem_ptr(b64, &bptr);
-
+                BIO_set_mem_buf(b64, bptr, BIO_CLOSE);
+                
                 //Write directly to base64-buffer to avoid copy
                 int base64_length=static_cast<int>(round(4*ceil((double)ascii.size()/3.0)));
                 base64.resize(base64_length);
