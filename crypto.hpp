@@ -18,11 +18,11 @@ namespace SimpleWeb {
         }
     #endif
 
-    //type must support size(), resize() and operator[]
     namespace Crypto {
         namespace Base64 {
-            template<class type>
-            void encode(const type& ascii, type& base64) {
+            std::string encode(const std::string &ascii) {
+                std::string base64;
+                
                 BIO *bio, *b64;
                 BUF_MEM *bptr=BUF_MEM_new();
 
@@ -48,16 +48,13 @@ namespace SimpleWeb {
                 bptr->data=nullptr;
 
                 BIO_free_all(b64);
-            }
-            template<class type>
-            type encode(const type& ascii) {
-                type base64;
-                encode(ascii, base64);
+                
                 return base64;
             }
             
-            template<class type>
-            void decode(const type& base64, type& ascii) {
+            std::string decode(const std::string &base64) {
+                std::string ascii;
+                
                 //Resize ascii, however, the size is a up to two bytes too large.
                 ascii.resize((6*base64.size())/8);
                 BIO *b64, *bio;
@@ -71,77 +68,56 @@ namespace SimpleWeb {
                 ascii.resize(decoded_length);
 
                 BIO_free_all(b64);
-            }
-            template<class type>
-            type decode(const type& base64) {
-                type ascii;
-                decode(base64, ascii);
+                
                 return ascii;
             }
-
         }
         
-        template<class type>
-        void MD5(const type& input, type& hash) {
-            MD5_CTX context;
-            MD5_Init(&context);
-            MD5_Update(&context, &input[0], input.size());
+        std::string MD5(const std::string &input, size_t iterations=1) {
+            std::string hash;
             
-            hash.resize(128/8);
-            MD5_Final((unsigned char*)&hash[0], &context);
-        }
-        template<class type>
-        type MD5(const type& input) {
-            type hash;
-            MD5(input, hash);
+            hash.resize(128 / 8);
+            ::MD5(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
+            for (size_t c = 1; c < iterations; ++c)
+              ::MD5(reinterpret_cast<const unsigned char*>(&hash[0]), hash.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
             return hash;
         }
 
-        template<class type>
-        void SHA1(const type& input, type& hash) {
-            SHA_CTX context;
-            SHA1_Init(&context);
-            SHA1_Update(&context, &input[0], input.size());
+        std::string SHA1(const std::string &input, size_t iterations=1) {
+            std::string hash;
             
-            hash.resize(160/8);
-            SHA1_Final((unsigned char*)&hash[0], &context);
-        }
-        template<class type>
-        type SHA1(const type& input) {
-            type hash;
-            SHA1(input, hash);
+            hash.resize(160 / 8);
+            ::SHA1(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
+            for (size_t c = 1; c < iterations; ++c)
+              ::SHA1(reinterpret_cast<const unsigned char*>(&hash[0]), hash.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
             return hash;
         }
 
-        template<class type>
-        void SHA256(const type& input, type& hash) {
-            SHA256_CTX context;
-            SHA256_Init(&context);
-            SHA256_Update(&context, &input[0], input.size());
+        std::string SHA256(const std::string &input, size_t iterations=1) {
+            std::string hash;
             
-            hash.resize(256/8);
-            SHA256_Final((unsigned char*)&hash[0], &context);
-        }
-        template<class type>
-        type SHA256(const type& input) {
-            type hash;
-            SHA256(input, hash);
+            hash.resize(256 / 8);
+            ::SHA256(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
+            for (size_t c = 1; c < iterations; ++c)
+              ::SHA256(reinterpret_cast<const unsigned char*>(&hash[0]), hash.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
             return hash;
         }
 
-        template<class type>
-        void SHA512(const type& input, type& hash) {
-            SHA512_CTX context;
-            SHA512_Init(&context);
-            SHA512_Update(&context, &input[0], input.size());
+        std::string SHA512(const std::string &input, size_t iterations=1) {
+            std::string hash;
             
-            hash.resize(512/8);
-            SHA512_Final((unsigned char*)&hash[0], &context);
-        }
-        template<class type>
-        type SHA512(const type& input) {
-            type hash;
-            SHA512(input, hash);
+            hash.resize(512 / 8);
+            ::SHA512(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
+            for (size_t c = 1; c < iterations; ++c)
+              ::SHA512(reinterpret_cast<const unsigned char*>(&hash[0]), hash.size(), reinterpret_cast<unsigned char*>(&hash[0]));
+            
             return hash;
         }
     }

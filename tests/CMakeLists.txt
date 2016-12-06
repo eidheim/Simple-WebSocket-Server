@@ -11,6 +11,7 @@ target_link_libraries(io_test ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(parse_test parse_test.cpp)
 target_link_libraries(parse_test ${Boost_LIBRARIES})
+target_link_libraries(parse_test ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(parse_test ${CMAKE_THREAD_LIBS_INIT})
 
 if(MSYS)
