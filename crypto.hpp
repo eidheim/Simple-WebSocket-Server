@@ -18,9 +18,11 @@ namespace SimpleWeb {
         }
     #endif
 
-    namespace Crypto {
-        namespace Base64 {
-            std::string encode(const std::string &ascii) {
+    class Crypto {
+    public:
+        class Base64 {
+        public:
+            static std::string encode(const std::string &ascii) {
                 std::string base64;
                 
                 BIO *bio, *b64;
@@ -52,7 +54,7 @@ namespace SimpleWeb {
                 return base64;
             }
             
-            std::string decode(const std::string &base64) {
+            static std::string decode(const std::string &base64) {
                 std::string ascii;
                 
                 //Resize ascii, however, the size is a up to two bytes too large.
@@ -71,9 +73,9 @@ namespace SimpleWeb {
                 
                 return ascii;
             }
-        }
+        };
         
-        std::string MD5(const std::string &input, size_t iterations=1) {
+        static std::string MD5(const std::string &input, size_t iterations=1) {
             std::string hash;
             
             hash.resize(128 / 8);
@@ -85,7 +87,7 @@ namespace SimpleWeb {
             return hash;
         }
 
-        std::string SHA1(const std::string &input, size_t iterations=1) {
+        static std::string SHA1(const std::string &input, size_t iterations=1) {
             std::string hash;
             
             hash.resize(160 / 8);
@@ -97,7 +99,7 @@ namespace SimpleWeb {
             return hash;
         }
 
-        std::string SHA256(const std::string &input, size_t iterations=1) {
+        static std::string SHA256(const std::string &input, size_t iterations=1) {
             std::string hash;
             
             hash.resize(256 / 8);
@@ -109,7 +111,7 @@ namespace SimpleWeb {
             return hash;
         }
 
-        std::string SHA512(const std::string &input, size_t iterations=1) {
+        static std::string SHA512(const std::string &input, size_t iterations=1) {
             std::string hash;
             
             hash.resize(512 / 8);
@@ -120,7 +122,7 @@ namespace SimpleWeb {
             
             return hash;
         }
-    }
+    };
 }
 #endif	/* CRYPTO_HPP */
 
