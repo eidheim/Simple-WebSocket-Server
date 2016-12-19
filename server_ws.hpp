@@ -183,7 +183,7 @@ namespace SimpleWeb {
         std::vector<std::pair<REGEX_NS::regex, Endpoint*> > opt_endpoint;
         
     public:
-        void start() {
+        virtual void start() {
             opt_endpoint.clear();
             for(auto& endp: endpoint) {
                 opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
