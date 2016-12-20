@@ -270,7 +270,7 @@ namespace SimpleWeb {
             request << "\r\n";
             
             //test this to base64::decode(Sec-WebSocket-Accept)
-            std::shared_ptr<std::string> accept_sha1(new std::string(Crypto::SHA1(nonce_base64+ws_magic_string)));
+            std::shared_ptr<std::string> accept_sha1(new std::string(Crypto::sha1(nonce_base64+ws_magic_string)));
             
             boost::asio::async_write(*connection->socket, *write_buffer, 
                     [this, write_buffer, accept_sha1]

@@ -423,7 +423,7 @@ namespace SimpleWeb {
             if(connection->header.count("Sec-WebSocket-Key")==0)
                 return 0;
             
-            auto sha1=Crypto::SHA1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
+            auto sha1=Crypto::sha1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
 
             handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
             handshake << "Upgrade: websocket\r\n";
