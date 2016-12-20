@@ -39,15 +39,6 @@ const vector<pair<string, string> > SHA512_string_tests = {
     {"The quick brown fox jumps over the lazy dog", "07e547d9586f6a73f73fbac0435ed76951218fb7d0c8d788a309d785436bbb642e93a252a954f23912547d1e8a3b5ed6e1bfd7097821233fa0538f3db854fee6"}
 };
 
-string hex_string(const std::string &chars) {
-    stringstream hex_ss;
-    hex_ss.fill('0');
-    for(auto c: chars) {
-        hex_ss << setw(2) << hex << static_cast<int>(static_cast<unsigned char>(c));
-    }
-    return hex_ss.str();
-}
-
 int main() {
     //Testing SimpleWeb::Crypt::Base64
     for(auto& string_test: Base64_string_tests) {
@@ -57,22 +48,21 @@ int main() {
     
     //Testing SimpleWeb::Crypt::MD5
     for(auto& string_test: MD5_string_tests)
-        assert(hex_string(Crypto::MD5(string_test.first)) == string_test.second);
+        assert(Crypto::to_hex_string(Crypto::MD5(string_test.first)) == string_test.second);
     
     //Testing SimpleWeb::Crypt::SHA1
     for(auto& string_test: SHA1_string_tests)
-        assert(hex_string(Crypto::SHA1(string_test.first)) == string_test.second);
+        assert(Crypto::to_hex_string(Crypto::SHA1(string_test.first)) == string_test.second);
     
     //Testing SimpleWeb::Crypt::SHA256
     for(auto& string_test: SHA256_string_tests)
-        assert(hex_string(Crypto::SHA256(string_test.first)) == string_test.second);
+        assert(Crypto::to_hex_string(Crypto::SHA256(string_test.first)) == string_test.second);
     
     //Testing SimpleWeb::Crypt::SHA512
     for(auto& string_test: SHA512_string_tests)
-        assert(hex_string(Crypto::SHA512(string_test.first)) == string_test.second);
+        assert(Crypto::to_hex_string(Crypto::SHA512(string_test.first)) == string_test.second);
     
     //Testing iterations
-    assert(hex_string(Crypto::SHA1("Test", 1)) == "640ab2bae07bedc4c163f679a746f7ab7fb5d1fa");
-    assert(hex_string(Crypto::SHA1("Test", 2)) == "af31c6cbdecd88726d0a9b3798c71ef41f1624d5");
+    assert(Crypto::to_hex_string(Crypto::SHA1("Test", 1)) == "640ab2bae07bedc4c163f679a746f7ab7fb5d1fa");
+    assert(Crypto::to_hex_string(Crypto::SHA1("Test", 2)) == "af31c6cbdecd88726d0a9b3798c71ef41f1624d5");
 }
-
