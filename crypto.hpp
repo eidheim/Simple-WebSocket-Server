@@ -82,7 +82,7 @@ namespace SimpleWeb {
           std::stringstream hex_stream;
           hex_stream << std::hex << std::internal << std::setfill('0');
           for (auto &byte : input)
-            hex_stream << std::setw(2) << (int)(unsigned char)byte;
+            hex_stream << std::setw(2) << static_cast<int>(static_cast<unsigned char>(byte));
           return hex_stream.str();
         }
         
