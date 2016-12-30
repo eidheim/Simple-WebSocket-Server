@@ -9,13 +9,15 @@ typedef SimpleWeb::SocketServer<SimpleWeb::WS> WsServer;
 typedef SimpleWeb::SocketClient<SimpleWeb::WS> WsClient;
 
 int main() {
-    WsServer server(8080, 4);
+    WsServer server;
+    server.config.port=8080;
+    server.config.thread_pool_size=4;
     
     auto& echo=server.endpoint["^/echo/?$"];
     
     atomic<int> server_callback_count(0);
     
-    echo.onmessage=[&server, &server_callback_count](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    echo.on_message=[&server, &server_callback_count](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
         auto message_str=message->string();
         assert(message_str=="Hello");
         
@@ -30,21 +32,21 @@ int main() {
         });
     };
     
-    echo.onopen=[&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/) {
+    echo.on_open=[&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/) {
         ++server_callback_count;
     };
     
-    echo.onclose=[&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/, int /*status*/, const string& /*reason*/) {
+    echo.on_close=[&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/, int /*status*/, const string& /*reason*/) {
         ++server_callback_count;
     };
     
-    echo.onerror=[](shared_ptr<WsServer::Connection> /*connection*/, const boost::system::error_code& ec) {
+    echo.on_error=[](shared_ptr<WsServer::Connection> /*connection*/, const boost::system::error_code& ec) {
         cerr << ec.message() << endl;
         assert(false);
     };
     
     auto& echo_thrice=server.endpoint["^/echo_thrice/?$"];
-    echo_thrice.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    echo_thrice.on_message=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
         auto message_str=message->string();
         
         auto send_stream1=make_shared<WsServer::SendStream>();
@@ -73,7 +75,7 @@ int main() {
         
         atomic<int> client_callback_count(0);
         
-        client.onmessage=[&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+        client.on_message=[&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
             assert(message->string()=="Hello");
             
             ++client_callback_count;
@@ -81,7 +83,7 @@ int main() {
             client.send_close(1000);
         };
         
-        client.onopen=[&client, &client_callback_count]() {
+        client.on_open=[&client, &client_callback_count]() {
             ++client_callback_count;
             
             auto send_stream=make_shared<WsClient::SendStream>();
@@ -89,11 +91,11 @@ int main() {
             client.send(send_stream);
         };
         
-        client.onclose=[&client_callback_count](int /*status*/, const string& /*reason*/) {
+        client.on_close=[&client_callback_count](int /*status*/, const string& /*reason*/) {
             ++client_callback_count;
         };
         
-        client.onerror=[](const boost::system::error_code& ec) {
+        client.on_error=[](const boost::system::error_code& ec) {
             cerr << ec.message() << endl;
             assert(false);
         };
@@ -115,7 +117,7 @@ int main() {
         
         atomic<int> client_callback_count(0);
         
-        client.onmessage=[&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+        client.on_message=[&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
             assert(message->string()=="Hello");
             
             ++client_callback_count;
@@ -123,7 +125,7 @@ int main() {
             client.send_close(1000);
         };
         
-        client.onopen=[&client, &client_callback_count]() {
+        client.on_open=[&client, &client_callback_count]() {
             ++client_callback_count;
             
             auto send_stream=make_shared<WsClient::SendStream>();
@@ -131,11 +133,11 @@ int main() {
             client.send(send_stream);
         };
         
-        client.onclose=[&client_callback_count](int /*status*/, const string& /*reason*/) {
+        client.on_close=[&client_callback_count](int /*status*/, const string& /*reason*/) {
             ++client_callback_count;
         };
         
-        client.onerror=[](const boost::system::error_code& ec) {
+        client.on_error=[](const boost::system::error_code& ec) {
             cerr << ec.message() << endl;
             assert(false);
         };

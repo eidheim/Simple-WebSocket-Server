@@ -11,7 +11,27 @@
 #include <atomic>
 #include <list>
 
+// TODO: remove when onopen, onmessage, etc is removed
+#ifndef DEPRECATED
+#ifdef __GNUC__
+#define DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define DEPRECATED __declspec(deprecated)
+#else
+#define DEPRECATED
+#endif
+#endif
+
 namespace SimpleWeb {
+    // TODO: remove when onopen, onmessage, etc is removed
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #elif defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable: 4996)
+    #endif
+    
     template <class socket_type>
     class SocketClient;
     
@@ -109,12 +129,26 @@ namespace SimpleWeb {
             boost::asio::streambuf streambuf;
         };
         
-        std::function<void(void)> onopen;
-        std::function<void(std::shared_ptr<Message>)> onmessage;
-        std::function<void(const boost::system::error_code&)> onerror;
-        std::function<void(int, const std::string&)> onclose;
+        DEPRECATED std::function<void(void)> onopen;
+        std::function<void(void)> on_open;
+        DEPRECATED std::function<void(std::shared_ptr<Message>)> onmessage;
+        std::function<void(std::shared_ptr<Message>)> on_message;
+        DEPRECATED std::function<void(int, const std::string&)> onclose;
+        std::function<void(int, const std::string&)> on_close;
+        DEPRECATED std::function<void(const boost::system::error_code&)> onerror;
+        std::function<void(const boost::system::error_code&)> on_error;
         
         void start() {
+            // TODO remove when onopen, onmessage, etc is removed:
+            if(onopen && !on_open)
+                on_open=onopen;
+            if(onmessage && !on_message)
+                on_message=onmessage;
+            if(onclose && !on_close)
+                on_close=onclose;
+            if(onerror && !on_error)
+                on_error=onerror;
+            
             if(!io_service) {
                 io_service=std::make_shared<boost::asio::io_service>();
                 internal_io_service=true;
@@ -284,19 +318,19 @@ namespace SimpleWeb {
                         if(!ec) {                            
                             parse_handshake(*message);
                             if(Crypto::Base64::decode(connection->header["Sec-WebSocket-Accept"])==*accept_sha1) {
-                                if(onopen)
-                                    onopen();
+                                if(on_open)
+                                    on_open();
                                 read_message(message);
                             }
-                            else if(onerror)
-                                onerror(boost::system::error_code(boost::system::errc::protocol_error, boost::system::generic_category()));
+                            else if(on_error)
+                                on_error(boost::system::error_code(boost::system::errc::protocol_error, boost::system::generic_category()));
                         }
-                        else if(onerror)
-                            onerror(ec);
+                        else if(on_error)
+                            on_error(ec);
                     });
                 }
-                else if(onerror)
-                    onerror(ec);
+                else if(on_error)
+                    on_error(ec);
             });
         }
         
@@ -339,8 +373,8 @@ namespace SimpleWeb {
                         const std::string reason("message from server masked");
                         auto kept_connection=connection;
                         send_close(1002, reason, [this, kept_connection](const boost::system::error_code& /*ec*/) {});
-                        if(onclose)
-                            onclose(1002, reason);
+                        if(on_close)
+                            on_close(1002, reason);
                         return;
                     }
                     
@@ -364,8 +398,8 @@ namespace SimpleWeb {
                                 message->length=length;
                                 read_message_content(message);
                             }
-                            else if(onerror)
-                                onerror(ec);
+                            else if(on_error)
+                                on_error(ec);
                         });
                     }
                     else if(length==127) {
@@ -386,8 +420,8 @@ namespace SimpleWeb {
                                 message->length=length;
                                 read_message_content(message);
                             }
-                            else if(onerror)
-                                onerror(ec);
+                            else if(on_error)
+                                on_error(ec);
                         });
                     }
                     else {
@@ -395,8 +429,8 @@ namespace SimpleWeb {
                         read_message_content(message);
                     }
                 }
-                else if(onerror)
-                    onerror(ec);
+                else if(on_error)
+                    on_error(ec);
             });
         }
         
@@ -417,8 +451,8 @@ namespace SimpleWeb {
                         auto reason=message->string();
                         auto kept_connection=connection;
                         send_close(status, reason, [this, kept_connection](const boost::system::error_code& /*ec*/) {});
-                        if(onclose)
-                            onclose(status, reason);
+                        if(on_close)
+                            on_close(status, reason);
                         return;
                     }
                     //If ping
@@ -427,16 +461,16 @@ namespace SimpleWeb {
                         auto empty_send_stream=std::make_shared<SendStream>();
                         send(empty_send_stream, nullptr, message->fin_rsv_opcode+1);
                     }
-                    else if(onmessage) {
-                        onmessage(message);
+                    else if(on_message) {
+                        on_message(message);
                     }
 
                     //Next message
                     std::shared_ptr<Message> next_message(new Message());
                     read_message(next_message);
                 }
-                else if(onerror)
-                    onerror(ec);
+                else if(on_error)
+                    on_error(ec);
             });
         }
     };
@@ -468,15 +502,21 @@ namespace SimpleWeb {
                             
                             handshake();
                         }
-                        else if(onerror)
-                            onerror(ec);
+                        else if(on_error)
+                            on_error(ec);
                     });
                 }
-                else if(onerror)
-                    onerror(ec);
+                else if(on_error)
+                    on_error(ec);
             });
         }
     };
+    // TODO: remove when onopen, onmessage, etc is removed:
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #elif defined(_MSC_VER)
+    #pragma warning(pop)
+    #endif
 }
 
 #endif	/* CLIENT_WS_HPP */

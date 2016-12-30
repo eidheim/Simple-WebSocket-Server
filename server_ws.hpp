@@ -36,6 +36,15 @@
 #endif
 
 namespace SimpleWeb {
+    // TODO: remove when onopen, onmessage, etc is removed:
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    #elif defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable: 4996)
+    #endif
+    
     template <class socket_type>
     class SocketServer;
         
@@ -159,11 +168,15 @@ namespace SimpleWeb {
             std::unordered_set<std::shared_ptr<Connection> > connections;
             std::mutex connections_mutex;
 
-        public:            
-            std::function<void(std::shared_ptr<Connection>)> onopen;
-            std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
-            std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
-            std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
+        public:
+            DEPRECATED std::function<void(std::shared_ptr<Connection>)> onopen;
+            std::function<void(std::shared_ptr<Connection>)> on_open;
+            DEPRECATED std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
+            std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
+            DEPRECATED std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
+            std::function<void(std::shared_ptr<Connection>, int, const std::string&)> on_close;
+            DEPRECATED std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
+            std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> on_error;
             
             std::unordered_set<std::shared_ptr<Connection> > get_connections() {
                 std::lock_guard<std::mutex> lock(connections_mutex);
@@ -202,8 +215,18 @@ namespace SimpleWeb {
     public:
         virtual void start() {
             opt_endpoint.clear();
-            for(auto& endp: endpoint) {
+            for(auto &endp: endpoint) {
                 opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
+                
+                // TODO remove when onopen, onmessage, etc is removed:
+                if(endp.second.onopen && !endp.second.on_open)
+                    endp.second.on_open=endp.second.onopen;
+                if(endp.second.onmessage && !endp.second.on_message)
+                    endp.second.on_message=endp.second.onmessage;
+                if(endp.second.onclose && !endp.second.on_close)
+                    endp.second.on_close=endp.second.onclose;
+                if(endp.second.onerror && !endp.second.on_error)
+                    endp.second.on_error=endp.second.onerror;
             }
             
             if(!io_service)
@@ -573,9 +596,9 @@ namespace SimpleWeb {
                             auto empty_send_stream=std::make_shared<SendStream>();
                             send(connection, empty_send_stream, nullptr, fin_rsv_opcode+1);
                         }
-                        else if(endpoint.onmessage) {
+                        else if(endpoint.on_message) {
                             timer_idle_reset(connection);
-                            endpoint.onmessage(connection, message);
+                            endpoint.on_message(connection, message);
                         }
     
                         //Next message
@@ -595,8 +618,8 @@ namespace SimpleWeb {
                 endpoint.connections.insert(connection);
             }
             
-            if(endpoint.onopen)
-                endpoint.onopen(connection);
+            if(endpoint.on_open)
+                endpoint.on_open(connection);
         }
         
         void connection_close(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, int status, const std::string& reason) const {
@@ -607,8 +630,8 @@ namespace SimpleWeb {
                 endpoint.connections.erase(connection);
             }
             
-            if(endpoint.onclose)
-                endpoint.onclose(connection, status, reason);
+            if(endpoint.on_close)
+                endpoint.on_close(connection, status, reason);
         }
         
         void connection_error(const std::shared_ptr<Connection> &connection, Endpoint& endpoint, const boost::system::error_code& ec) const {
@@ -619,10 +642,8 @@ namespace SimpleWeb {
                 endpoint.connections.erase(connection);
             }
             
-            if(endpoint.onerror) {
-                boost::system::error_code ec_tmp=ec;
-                endpoint.onerror(connection, ec_tmp);
-            }
+            if(endpoint.on_error)
+                endpoint.on_error(connection, ec);
         }
         
         void timer_idle_init(const std::shared_ptr<Connection> &connection) {
@@ -687,5 +708,12 @@ namespace SimpleWeb {
             });
         }
     };
+    // TODO: remove when onopen, onmessage, etc is removed:
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #elif defined(_MSC_VER)
+    #pragma warning(pop)
+    #endif
 }
+
 #endif	/* SERVER_WS_HPP */

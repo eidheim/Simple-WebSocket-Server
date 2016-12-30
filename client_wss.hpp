@@ -55,16 +55,16 @@ namespace SimpleWeb {
                                     [this](const boost::system::error_code& ec) {
                                 if(!ec)
                                     handshake();
-                                else if(onerror)
-                                    onerror(ec);
+                                else if(on_error)
+                                    on_error(ec);
                             });
                         }
-                        else if(onerror)
-                            onerror(ec);
+                        else if(on_error)
+                            on_error(ec);
                     });
                 }
-                else if(onerror)
-                    onerror(ec);
+                else if(on_error)
+                    on_error(ec);
             });
         }
     };

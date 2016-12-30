@@ -19,7 +19,7 @@ int main() {
     //    ws.send("test");
     auto& echo=server.endpoint["^/echo/?$"];
     
-    echo.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    echo.on_message=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
         //WsServer::Message::string() is a convenience function for:
         //stringstream data_ss;
         //data_ss << message->rdbuf();
@@ -42,17 +42,17 @@ int main() {
         });
     };
     
-    echo.onopen=[](shared_ptr<WsServer::Connection> connection) {
+    echo.on_open=[](shared_ptr<WsServer::Connection> connection) {
         cout << "Server: Opened connection " << (size_t)connection.get() << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
-    echo.onclose=[](shared_ptr<WsServer::Connection> connection, int status, const string& /*reason*/) {
+    echo.on_close=[](shared_ptr<WsServer::Connection> connection, int status, const string& /*reason*/) {
         cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    echo.onerror=[](shared_ptr<WsServer::Connection> connection, const boost::system::error_code& ec) {
+    echo.on_error=[](shared_ptr<WsServer::Connection> connection, const boost::system::error_code& ec) {
         cout << "Server: Error in connection " << (size_t)connection.get() << ". " << 
                 "Error: " << ec << ", error message: " << ec.message() << endl;
     };
@@ -64,7 +64,7 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo_thrice=server.endpoint["^/echo_thrice/?$"];
-    echo_thrice.onmessage=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    echo_thrice.on_message=[&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
         auto message_str=message->string();
         
         auto send_stream1=make_shared<WsServer::SendStream>();
@@ -90,7 +90,7 @@ int main() {
     //    ws.onmessage=function(evt){console.log(evt.data);};
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
-    echo_all.onmessage=[&server](shared_ptr<WsServer::Connection> /*connection*/, shared_ptr<WsServer::Message> message) {
+    echo_all.on_message=[&server](shared_ptr<WsServer::Connection> /*connection*/, shared_ptr<WsServer::Message> message) {
         auto message_str=message->string();
         
         //echo_all.get_connections() can also be used to solely receive connections on this endpoint
@@ -123,7 +123,7 @@ int main() {
     //Server: Closed connection 140184920260656 with status code 1000
     //Client: Closed connection with status code 1000
     WsClient client("localhost:8080/echo");
-    client.onmessage=[&client](shared_ptr<WsClient::Message> message) {
+    client.on_message=[&client](shared_ptr<WsClient::Message> message) {
         auto message_str=message->string();
         
         cout << "Client: Message received: \"" << message_str << "\"" << endl;
@@ -132,7 +132,7 @@ int main() {
         client.send_close(1000);
     };
     
-    client.onopen=[&client]() {
+    client.on_open=[&client]() {
         cout << "Client: Opened connection" << endl;
         
         string message="Hello";
@@ -143,12 +143,12 @@ int main() {
         client.send(send_stream);
     };
     
-    client.onclose=[](int status, const string& /*reason*/) {
+    client.on_close=[](int status, const string& /*reason*/) {
         cout << "Client: Closed connection with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    client.onerror=[](const boost::system::error_code& ec) {
+    client.on_error=[](const boost::system::error_code& ec) {
         cout << "Client: Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
