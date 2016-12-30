@@ -8,7 +8,7 @@ using namespace SimpleWeb;
 class SocketServerTest : public SocketServerBase<WS> {
 public:
     SocketServerTest() : 
-            SocketServerBase<WS>::SocketServerBase(8080, 1, 5, 300) {}
+            SocketServerBase<WS>::SocketServerBase(8080) {}
             
     void accept() {}
     

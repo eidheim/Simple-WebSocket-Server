@@ -8,7 +8,8 @@ typedef SimpleWeb::SocketClient<SimpleWeb::WSS> WssClient;
 
 int main() {
     //WebSocket Secure (WSS)-server at port 8080 using 1 thread
-    WssServer server(8080, 1, "server.crt", "server.key");
+    WssServer server("server.crt", "server.key");
+    server.config.port=8080;
     
     //Example 1: echo WebSocket Secure endpoint
     //  Added debug messages for example use of the callbacks

@@ -24,6 +24,17 @@
 #define REGEX_NS std
 #endif
 
+// TODO when switching to c++14, use [[deprecated]] instead
+#ifndef DEPRECATED
+#ifdef __GNUC__
+#define DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define DEPRECATED __declspec(deprecated)
+#else
+#define DEPRECATED
+#endif
+#endif
+
 namespace SimpleWeb {
     template <class socket_type>
     class SocketServer;
@@ -164,15 +175,21 @@ namespace SimpleWeb {
         class Config {
             friend class SocketServerBase<socket_type>;
         private:
-            Config(unsigned short port, size_t num_threads): num_threads(num_threads), port(port), reuse_address(true) {}
-            size_t num_threads;
+            Config(unsigned short port): port(port) {}
         public:
+            /// Port number to use. Defaults to 80 for HTTP and 443 for HTTPS.
             unsigned short port;
-            ///IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
-            ///If empty, the address will be any address.
+            /// Number of threads that the server will use when start() is called. Defaults to 1 thread.
+            size_t thread_pool_size=1;
+            /// Timeout on request handling. Defaults to 5 seconds.
+            size_t timeout_request=5;
+            /// Idle timeout. Defaults to no timeout.
+            size_t timeout_idle=0;
+            /// IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
+            /// If empty, the address will be any address.
             std::string address;
-            ///Set to false to avoid binding the socket to an address that is already in use.
-            bool reuse_address;
+            /// Set to false to avoid binding the socket to an address that is already in use. Defaults to true.
+            bool reuse_address=true;
         };
         ///Set before calling start().
         Config config;
@@ -210,15 +227,15 @@ namespace SimpleWeb {
             
             accept();
             
-            //If num_threads>1, start m_io_service.run() in (num_threads-1) threads for thread-pooling
+            //If thread_pool_size>1, start m_io_service.run() in (thread_pool_size-1) threads for thread-pooling
             threads.clear();
-            for(size_t c=1;c<config.num_threads;c++) {
+            for(size_t c=1;c<config.thread_pool_size;c++) {
                 threads.emplace_back([this](){
                     io_service->run();
                 });
             }
             //Main thread
-            if(config.num_threads>0)
+            if(config.thread_pool_size>0)
                 io_service->run();
 
             //Wait for the rest of the threads, if any, to finish as well
@@ -229,7 +246,7 @@ namespace SimpleWeb {
         
         void stop() {
             acceptor->close();
-            if(config.num_threads>0)
+            if(config.thread_pool_size>0)
                 io_service->stop();
             
             for(auto& p: endpoint)
@@ -303,7 +320,7 @@ namespace SimpleWeb {
         }
         
         /// If you have your own boost::asio::io_service, store its pointer here before running start().
-        /// You might also want to set config.num_threads to 0.
+        /// You might also want to set config.thread_pool_size to 0.
         std::shared_ptr<boost::asio::io_service> io_service;
     protected:
         const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -312,11 +329,8 @@ namespace SimpleWeb {
         
         std::vector<std::thread> threads;
         
-        size_t timeout_request;
-        size_t timeout_idle;
-        
-        SocketServerBase(unsigned short port, size_t num_threads, size_t timeout_request, size_t timeout_idle) : 
-                config(port, num_threads), timeout_request(timeout_request), timeout_idle(timeout_idle) {}
+        SocketServerBase(unsigned short port) : 
+                config(port) {}
         
         virtual void accept()=0;
         
@@ -343,7 +357,7 @@ namespace SimpleWeb {
             std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
 
             //Set timeout on the following boost::asio::async-read or write function
-            auto timer=get_timeout_timer(connection, timeout_request);
+            auto timer=get_timeout_timer(connection, config.timeout_request);
             
             boost::asio::async_read_until(*connection->socket, *read_buffer, "\r\n\r\n",
                     [this, connection, read_buffer, timer]
@@ -612,18 +626,18 @@ namespace SimpleWeb {
         }
         
         void timer_idle_init(const std::shared_ptr<Connection> &connection) {
-            if(timeout_idle>0) {
+            if(config.timeout_idle>0) {
                 connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(*io_service));
-                connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)));
+                connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(config.timeout_idle)));
                 timer_idle_expired_function(connection);
             }
         }
         void timer_idle_reset(const std::shared_ptr<Connection> &connection) const {
-            if(timeout_idle>0 && connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(timeout_idle)))>0)
+            if(config.timeout_idle>0 && connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(config.timeout_idle)))>0)
                 timer_idle_expired_function(connection);
         }
         void timer_idle_cancel(const std::shared_ptr<Connection> &connection) const {
-            if(timeout_idle>0)
+            if(config.timeout_idle>0)
                 connection->timer_idle->cancel();
         }
         
@@ -643,8 +657,15 @@ namespace SimpleWeb {
     template<>
     class SocketServer<WS> : public SocketServerBase<WS> {
     public:
-        SocketServer(unsigned short port, size_t num_threads=1, size_t timeout_request=5, size_t timeout_idle=0) : 
-                SocketServerBase<WS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle) {};
+        DEPRECATED SocketServer(unsigned short port, size_t thread_pool_size=1, size_t timeout_request=5, size_t timeout_idle=0) : 
+                SocketServer() {
+            config.port=port;
+            config.thread_pool_size=thread_pool_size;
+            config.timeout_request=timeout_request;
+            config.timeout_idle=timeout_idle;
+        };
+        
+        SocketServer() : SocketServerBase<WS>(80) {}
         
     protected:
         void accept() {

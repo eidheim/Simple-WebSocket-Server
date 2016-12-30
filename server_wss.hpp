@@ -14,11 +14,17 @@ namespace SimpleWeb {
         std::string session_id_context;
         bool set_session_id_context=false;
     public:
-        SocketServer(unsigned short port, size_t num_threads, const std::string& cert_file, const std::string& private_key_file, 
+        DEPRECATED SocketServer(unsigned short port, size_t thread_pool_size, const std::string& cert_file, const std::string& private_key_file, 
                 size_t timeout_request=5, size_t timeout_idle=0, 
-                const std::string& verify_file=std::string()) : 
-                SocketServerBase<WSS>::SocketServerBase(port, num_threads, timeout_request, timeout_idle), 
-                context(boost::asio::ssl::context::tlsv12) {
+                const std::string& verify_file=std::string()) : SocketServer(cert_file, private_key_file, verify_file) {
+            config.port=port;
+            config.thread_pool_size=thread_pool_size;
+            config.timeout_request=timeout_request;
+            config.timeout_idle=timeout_idle;
+        }
+        
+        SocketServer(const std::string& cert_file, const std::string& private_key_file,
+                     const std::string& verify_file=std::string()) : SocketServerBase<WSS>(443), context(boost::asio::ssl::context::tlsv12) {
             context.use_certificate_chain_file(cert_file);
             context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
             
@@ -59,7 +65,7 @@ namespace SimpleWeb {
                     connection->socket->lowest_layer().set_option(option);
                     
                     //Set timeout on the following boost::asio::ssl::stream::async_handshake
-                    auto timer=get_timeout_timer(connection, timeout_request);
+                    auto timer=get_timeout_timer(connection, config.timeout_request);
                     connection->socket->async_handshake(boost::asio::ssl::stream_base::server, 
                             [this, connection, timer](const boost::system::error_code& ec) {
                         if(timer)
