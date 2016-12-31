@@ -217,13 +217,13 @@ namespace SimpleWeb {
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-                if(endp.second.onopen && !endp.second.on_open)
+                if(endp.second.onopen)
                     endp.second.on_open=endp.second.onopen;
-                if(endp.second.onmessage && !endp.second.on_message)
+                if(endp.second.onmessage)
                     endp.second.on_message=endp.second.onmessage;
-                if(endp.second.onclose && !endp.second.on_close)
+                if(endp.second.onclose)
                     endp.second.on_close=endp.second.onclose;
-                if(endp.second.onerror && !endp.second.on_error)
+                if(endp.second.onerror)
                     endp.second.on_error=endp.second.onerror;
 #ifdef __GNUC__
 #pragma GCC diagnostic pop

@@ -138,13 +138,13 @@ namespace SimpleWeb {
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
-            if(onopen && !on_open)
+            if(onopen)
                 on_open=onopen;
-            if(onmessage && !on_message)
+            if(onmessage)
                 on_message=onmessage;
-            if(onclose && !on_close)
+            if(onclose)
                 on_close=onclose;
-            if(onerror && !on_error)
+            if(onerror)
                 on_error=onerror;
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
