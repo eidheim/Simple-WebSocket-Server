@@ -62,7 +62,7 @@ namespace SimpleWeb {
         public:
             std::string method, path, http_version;
 
-            std::unordered_map<std::string, std::string> header;
+            std::unordered_multimap<std::string, std::string> header;
 
             REGEX_NS::smatch path_match;
             
@@ -459,10 +459,11 @@ namespace SimpleWeb {
         }
         
         bool generate_handshake(const std::shared_ptr<Connection> &connection, std::ostream& handshake) const {
-            if(connection->header.count("Sec-WebSocket-Key")==0)
+            auto header_it=connection->header.find("Sec-WebSocket-Key");
+            if(header_it==connection->header.end())
                 return 0;
             
-            auto sha1=Crypto::sha1(connection->header["Sec-WebSocket-Key"]+ws_magic_string);
+            auto sha1=Crypto::sha1(header_it->second+ws_magic_string);
 
             handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
             handshake << "Upgrade: websocket\r\n";

@@ -47,7 +47,7 @@ namespace SimpleWeb {
             friend class SocketClient<socket_type>;
 
         public:
-            std::unordered_map<std::string, std::string> header;
+            std::unordered_multimap<std::string, std::string> header;
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
@@ -301,26 +301,25 @@ namespace SimpleWeb {
             for(int c=0;c<16;c++)
                 nonce[c]=static_cast<unsigned char>(dist(rd));
 
-            std::string nonce_base64=Crypto::Base64::encode(nonce);
-            request << "Sec-WebSocket-Key: " << nonce_base64 << "\r\n";
+            auto nonce_base64=std::make_shared<std::string>(Crypto::Base64::encode(nonce));
+            request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
             request << "Sec-WebSocket-Version: 13\r\n";
             request << "\r\n";
             
-            //test this to base64::decode(Sec-WebSocket-Accept)
-            std::shared_ptr<std::string> accept_sha1(new std::string(Crypto::sha1(nonce_base64+ws_magic_string)));
-            
             boost::asio::async_write(*connection->socket, *write_buffer, 
-                    [this, write_buffer, accept_sha1]
+                    [this, write_buffer, nonce_base64]
                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                 if(!ec) {
                     std::shared_ptr<Message> message(new Message());
 
                     boost::asio::async_read_until(*connection->socket, message->streambuf, "\r\n\r\n",
-                            [this, message, accept_sha1]
+                            [this, message, nonce_base64]
                             (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         if(!ec) {                            
                             parse_handshake(*message);
-                            if(Crypto::Base64::decode(connection->header["Sec-WebSocket-Accept"])==*accept_sha1) {
+                            auto header_it=connection->header.find("Sec-WebSocket-Accept");
+                            if(header_it!=connection->header.end() &&
+                               Crypto::Base64::decode(header_it->second)==Crypto::sha1(*nonce_base64+ws_magic_string)) {
                                 if(on_open)
                                     on_open();
                                 read_message(message);

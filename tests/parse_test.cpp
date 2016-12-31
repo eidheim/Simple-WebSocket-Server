@@ -1,6 +1,7 @@
 #include "server_ws.hpp"
 #include "client_ws.hpp"
 #include <iostream>
+#include <cassert>
 
 using namespace std;
 using namespace SimpleWeb;
@@ -12,7 +13,7 @@ public:
             
     void accept() {}
     
-    bool parse_request_test() {
+    void parse_request_test() {
         std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
         
         stringstream ss;
@@ -23,26 +24,15 @@ public:
         
         parse_handshake(connection, ss);
         
-        if(connection->method!="GET")
-            return 0;
-        if(connection->path!="/test/")
-            return 0;
-        if(connection->http_version!="1.1")
-            return 0;
+        assert(connection->method=="GET");
+        assert(connection->path=="/test/");
+        assert(connection->http_version=="1.1");
         
-        if(connection->header.size()!=2)
-            return 0;
-        if(connection->header.count("TestHeader")==0)
-            return 0;
-        if(connection->header["TestHeader"]!="test")
-            return 0;
-
-        if(connection->header.count("TestHeader2")==0)
-            return 0;
-        if(connection->header["TestHeader2"]!="test2")
-            return 0;
-        
-        return 1;
+        assert(connection->header.size()==2);
+        auto header_it=connection->header.find("TestHeader");
+        assert(header_it!=connection->header.end() && header_it->second=="test");
+        header_it=connection->header.find("TestHeader2");
+        assert(header_it!=connection->header.end() && header_it->second=="test2");
     }
 };
 
@@ -52,51 +42,31 @@ public:
     
     void connect() {}
     
-    bool constructor_parse_test1() {
-        if(path!="/test")
-            return 0;
-        if(host!="test.org")
-            return 0;
-        if(port!=8080)
-            return 0;
-        
-        return 1;
+    void constructor_parse_test1() {
+        assert(path=="/test");
+        assert(host=="test.org");
+        assert(port==8080);
     }
     
-    bool constructor_parse_test2() {
-        if(path!="/test")
-            return 0;
-        if(host!="test.org")
-            return 0;
-        if(port!=80)
-            return 0;
-        
-        return 1;
+    void constructor_parse_test2() {
+        assert(path=="/test");
+        assert(host=="test.org");
+        assert(port==80);
     }
     
-    bool constructor_parse_test3() {
-        if(path!="/")
-            return 0;
-        if(host!="test.org")
-            return 0;
-        if(port!=80)
-            return 0;
-        
-        return 1;
+    void constructor_parse_test3() {
+        assert(path=="/");
+        assert(host=="test.org");
+        assert(port==80);
     }
     
-    bool constructor_parse_test4() {
-        if(path!="/")
-            return 0;
-        if(host!="test.org")
-            return 0;
-        if(port!=8080)
-            return 0;
-        
-        return 1;
+    void constructor_parse_test4() {
+        assert(path=="/");
+        assert(host=="test.org");
+        assert(port==8080);
     }
     
-    bool parse_response_header_test() {
+    void parse_response_header_test() {
         connection=std::unique_ptr<Connection>(new Connection(new WS(*io_service)));
         
         stringstream ss;
@@ -107,20 +77,13 @@ public:
         
         parse_handshake(ss);
                 
-        if(connection->header.size()!=2)
-            return 0;
-        if(connection->header.count("TestHeader")==0)
-            return 0;
-        if(connection->header["TestHeader"]!="test")
-            return 0;
-
-        if(connection->header.count("TestHeader2")==0)
-            return 0;
-        if(connection->header["TestHeader2"]!="test2")
-            return 0;
+        assert(connection->header.size()==2);
+        auto header_it=connection->header.find("TestHeader");
+        assert(header_it!=connection->header.end() && header_it->second=="test");
+        header_it=connection->header.find("TestHeader2");
+        assert(header_it!=connection->header.end() && header_it->second=="test2");
         
         connection.reset();
-        return 1;
     }
 };
 
@@ -128,40 +91,20 @@ int main() {
     SocketServerTest serverTest;
     serverTest.io_service=std::make_shared<boost::asio::io_service>();
     
-    if(!serverTest.parse_request_test()) {
-        cerr << "FAIL SocketServer::parse_request" << endl;
-        return 1;
-    }
+    serverTest.parse_request_test();
     
     SocketClientTest clientTest("test.org:8080/test");
-    if(!clientTest.constructor_parse_test1()) {
-        cerr << "FAIL SocketClient::SocketClient" << endl;
-        return 1;
-    }
+    clientTest.constructor_parse_test1();
     
     SocketClientTest clientTest2("test.org/test");
-    if(!clientTest2.constructor_parse_test2()) {
-        cerr << "FAIL SocketClient::SocketClient" << endl;
-        return 1;
-    }
+    clientTest2.constructor_parse_test2();
     
     SocketClientTest clientTest3("test.org");
-    if(!clientTest3.constructor_parse_test3()) {
-        cerr << "FAIL SocketClient::SocketClient" << endl;
-        return 1;
-    }
+    clientTest3.constructor_parse_test3();
     
     SocketClientTest clientTest4("test.org:8080");
     clientTest4.io_service=std::make_shared<boost::asio::io_service>();
-    if(!clientTest4.constructor_parse_test4()) {
-        cerr << "FAIL SocketClient::SocketClient" << endl;
-        return 1;
-    }
+    clientTest4.constructor_parse_test4();
     
-    if(!clientTest4.parse_response_header_test()) {
-        cerr << "FAIL SocketClient::parse_response_header" << endl;
-        return 1;
-    }
-    
-    return 0;
+    clientTest4.parse_response_header_test();
 }
