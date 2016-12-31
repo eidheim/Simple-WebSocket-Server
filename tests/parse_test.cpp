@@ -33,6 +33,11 @@ public:
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("TestHeader2");
         assert(header_it!=connection->header.end() && header_it->second=="test2");
+        
+        header_it=connection->header.find("testheader");
+        assert(header_it!=connection->header.end() && header_it->second=="test");
+        header_it=connection->header.find("testheader2");
+        assert(header_it!=connection->header.end() && header_it->second=="test2");
     }
 };
 
@@ -81,6 +86,11 @@ public:
         auto header_it=connection->header.find("TestHeader");
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("TestHeader2");
+        assert(header_it!=connection->header.end() && header_it->second=="test2");
+        
+        header_it=connection->header.find("testheader");
+        assert(header_it!=connection->header.end() && header_it->second=="test");
+        header_it=connection->header.find("testheader2");
         assert(header_it!=connection->header.end() && header_it->second=="test2");
         
         connection.reset();
