@@ -5,6 +5,8 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/functional/hash.hpp>
 
 #include <unordered_map>
 #include <thread>
@@ -14,6 +16,26 @@
 #include <memory>
 #include <atomic>
 #include <iostream>
+
+#ifndef CASE_INSENSITIVE_EQUALS_AND_HASH
+#define CASE_INSENSITIVE_EQUALS_AND_HASH
+//Based on http://www.boost.org/doc/libs/1_60_0/doc/html/unordered/hash_equality.html
+class case_insensitive_equals {
+public:
+  bool operator()(const std::string &key1, const std::string &key2) const {
+    return boost::algorithm::iequals(key1, key2);
+  }
+};
+class case_insensitive_hash {
+public:
+  size_t operator()(const std::string &key) const {
+    std::size_t seed=0;
+    for(auto &c: key)
+      boost::hash_combine(seed, std::tolower(c));
+    return seed;
+  }
+};
+#endif
 
 // Late 2017 TODO: remove the following checks and always use std::regex
 #ifdef USE_BOOST_REGEX
@@ -62,7 +84,7 @@ namespace SimpleWeb {
         public:
             std::string method, path, http_version;
 
-            std::unordered_multimap<std::string, std::string> header;
+            std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> header;
 
             REGEX_NS::smatch path_match;
             
@@ -461,7 +483,7 @@ namespace SimpleWeb {
         bool generate_handshake(const std::shared_ptr<Connection> &connection, std::ostream& handshake) const {
             auto header_it=connection->header.find("Sec-WebSocket-Key");
             if(header_it==connection->header.end())
-                return 0;
+                return false;
             
             auto sha1=Crypto::sha1(header_it->second+ws_magic_string);
 
@@ -471,7 +493,7 @@ namespace SimpleWeb {
             handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
             handshake << "\r\n";
             
-            return 1;
+            return true;
         }
         
         void read_message(const std::shared_ptr<Connection> &connection,
