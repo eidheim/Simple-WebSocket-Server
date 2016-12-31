@@ -444,7 +444,7 @@ namespace SimpleWeb {
                             if(line[value_start]==' ')
                                 value_start++;
                             if(value_start<line.size())
-                                connection->header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size()-value_start-1)));
+                                connection->header.emplace(line.substr(0, param_end), line.substr(value_start, line.size()-value_start-1));
                         }
             
                         getline(stream, line);

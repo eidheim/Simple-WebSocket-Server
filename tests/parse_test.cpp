@@ -20,6 +20,8 @@ public:
         ss << "GET /test/ HTTP/1.1\r\n";
         ss << "TestHeader: test\r\n";
         ss << "TestHeader2:test2\r\n";
+        ss << "TestHeader3:test3a\r\n";
+        ss << "TestHeader3:test3b\r\n";
         ss << "\r\n";
         
         parse_handshake(connection, ss);
@@ -28,7 +30,7 @@ public:
         assert(connection->path=="/test/");
         assert(connection->http_version=="1.1");
         
-        assert(connection->header.size()==2);
+        assert(connection->header.size()==4);
         auto header_it=connection->header.find("TestHeader");
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("TestHeader2");
@@ -38,6 +40,14 @@ public:
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("testheader2");
         assert(header_it!=connection->header.end() && header_it->second=="test2");
+        
+        auto range=connection->header.equal_range("testheader3");
+        auto first=range.first;
+        auto second=first;
+        ++second;
+        assert(range.first!=connection->header.end() && range.second!=connection->header.end() &&
+               ((first->second=="test3a" && second->second=="test3b") ||
+                (first->second=="test3b" && second->second=="test3a")));
     }
 };
 
@@ -78,11 +88,13 @@ public:
         ss << "HTTP/1.1 200 OK\r\n";
         ss << "TestHeader: test\r\n";
         ss << "TestHeader2:test2\r\n";
+        ss << "TestHeader3:test3a\r\n";
+        ss << "TestHeader3:test3b\r\n";
         ss << "\r\n";
         
         parse_handshake(ss);
                 
-        assert(connection->header.size()==2);
+        assert(connection->header.size()==4);
         auto header_it=connection->header.find("TestHeader");
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("TestHeader2");
@@ -92,6 +104,14 @@ public:
         assert(header_it!=connection->header.end() && header_it->second=="test");
         header_it=connection->header.find("testheader2");
         assert(header_it!=connection->header.end() && header_it->second=="test2");
+        
+        auto range=connection->header.equal_range("testheader3");
+        auto first=range.first;
+        auto second=first;
+        ++second;
+        assert(range.first!=connection->header.end() && range.second!=connection->header.end() &&
+               ((first->second=="test3a" && second->second=="test3b") ||
+                (first->second=="test3b" && second->second=="test3a")));
         
         connection.reset();
     }
