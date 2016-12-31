@@ -36,15 +36,6 @@
 #endif
 
 namespace SimpleWeb {
-    // TODO: remove when onopen, onmessage, etc is removed:
-    #ifdef __GNUC__
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    #elif defined(_MSC_VER)
-    #pragma warning(push)
-    #pragma warning(disable: 4996)
-    #endif
-    
     template <class socket_type>
     class SocketServer;
         
@@ -218,7 +209,14 @@ namespace SimpleWeb {
             for(auto &endp: endpoint) {
                 opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
                 
-                // TODO remove when onopen, onmessage, etc is removed:
+                // TODO: remove when onopen, onmessage, etc is removed:
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
                 if(endp.second.onopen && !endp.second.on_open)
                     endp.second.on_open=endp.second.onopen;
                 if(endp.second.onmessage && !endp.second.on_message)
@@ -227,6 +225,11 @@ namespace SimpleWeb {
                     endp.second.on_close=endp.second.onclose;
                 if(endp.second.onerror && !endp.second.on_error)
                     endp.second.on_error=endp.second.onerror;
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
             }
             
             if(!io_service)
@@ -352,8 +355,7 @@ namespace SimpleWeb {
         
         std::vector<std::thread> threads;
         
-        SocketServerBase(unsigned short port) : 
-                config(port) {}
+        SocketServerBase(unsigned short port) : config(port) {}
         
         virtual void accept()=0;
         
@@ -708,12 +710,6 @@ namespace SimpleWeb {
             });
         }
     };
-    // TODO: remove when onopen, onmessage, etc is removed:
-    #ifdef __GNUC__
-    #pragma GCC diagnostic pop
-    #elif defined(_MSC_VER)
-    #pragma warning(pop)
-    #endif
 }
 
 #endif	/* SERVER_WS_HPP */

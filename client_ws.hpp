@@ -23,15 +23,6 @@
 #endif
 
 namespace SimpleWeb {
-    // TODO: remove when onopen, onmessage, etc is removed
-    #ifdef __GNUC__
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    #elif defined(_MSC_VER)
-    #pragma warning(push)
-    #pragma warning(disable: 4996)
-    #endif
-    
     template <class socket_type>
     class SocketClient;
     
@@ -139,7 +130,14 @@ namespace SimpleWeb {
         std::function<void(const boost::system::error_code&)> on_error;
         
         void start() {
-            // TODO remove when onopen, onmessage, etc is removed:
+            // TODO: remove when onopen, onmessage, etc is removed:
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
             if(onopen && !on_open)
                 on_open=onopen;
             if(onmessage && !on_message)
@@ -148,6 +146,11 @@ namespace SimpleWeb {
                 on_close=onclose;
             if(onerror && !on_error)
                 on_error=onerror;
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
             
             if(!io_service) {
                 io_service=std::make_shared<boost::asio::io_service>();
@@ -511,12 +514,6 @@ namespace SimpleWeb {
             });
         }
     };
-    // TODO: remove when onopen, onmessage, etc is removed:
-    #ifdef __GNUC__
-    #pragma GCC diagnostic pop
-    #elif defined(_MSC_VER)
-    #pragma warning(pop)
-    #endif
 }
 
 #endif	/* CLIENT_WS_HPP */
