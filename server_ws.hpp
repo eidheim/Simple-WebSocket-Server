@@ -91,6 +91,8 @@ namespace SimpleWeb {
             friend class SocketServer<socket_type>;
             
         public:
+            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
+            
             std::string method, path, http_version;
 
             std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> header;
@@ -101,8 +103,6 @@ namespace SimpleWeb {
             unsigned short remote_endpoint_port;
             
         private:
-            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
-            
             class SendData {
             public:
                 SendData(const std::shared_ptr<SendStream> &header_stream, const std::shared_ptr<SendStream> &message_stream,
@@ -364,24 +364,25 @@ namespace SimpleWeb {
             return all_connections;
         }
         
-        /// Upgrades a request, from for instance Simple-Web-Server, to a WebSocket connection.
-        /// The parameters are moved to the Connection object.
-        /// See also Server::on_upgrade in the Simple-Web-Server project.
-        /// Example use:
-        /// server.on_upgrade=[&socket_server] (...) {
-        ///   socket_server.upgrade(...);
-        /// }
-        /// The socket's io_service is used, thus running start() is not needed.
-        void upgrade(std::unique_ptr<socket_type> &socket, std::string &method, std::string &path, std::string &http_version,
-                     std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> &header) {
-            std::shared_ptr<Connection> connection(new Connection(socket.release()));
-            connection->method=std::move(method);
-            connection->path=std::move(path);
-            connection->http_version=std::move(http_version);
-            connection->header=std::move(header);
-            
-            connection->read_remote_endpoint_data();
-            
+        /**
+         * Upgrades a request, from for instance Simple-Web-Server, to a WebSocket connection.
+         * The parameters are moved to the Connection object.
+         * See also Server::on_upgrade in the Simple-Web-Server project.
+         * The socket's io_service is used, thus running start() is not needed.
+         *
+         * Example use:
+         * server.on_upgrade=[&socket_server] (auto io_service, auto request) {
+         * auto connection=std::make_shared<Connection>(io_service.release());
+         *   connection->method=std::move(request->method);
+         *   connection->path=std::move(request->path);
+         *   connection->http_version=std::move(request->http_version);
+         *   connection->header=std::move(request->header);
+         *   connection->remote_endpoint_address=std::move(request->remote_endpoint_address);
+         *   connection->remote_endpoint_port=request->remote_endpoint_port;
+         *   socket_server.upgrade(connection);
+         * }
+         */
+        void upgrade(const std::shared_ptr<Connection> &connection) {
             auto read_buffer=std::make_shared<boost::asio::streambuf>();
             write_handshake(connection, read_buffer);
         }
