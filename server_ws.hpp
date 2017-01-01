@@ -382,7 +382,7 @@ namespace SimpleWeb {
             if(seconds==0)
                 return nullptr;
             
-            auto timer=std::make_shared<boost::asio::deadline_timer>(*io_service);
+            auto timer=std::make_shared<boost::asio::deadline_timer>(connection->socket->get_io_service());
             timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
             timer->async_wait([connection](const boost::system::error_code& ec){
                 if(!ec) {
@@ -670,7 +670,7 @@ namespace SimpleWeb {
         
         void timer_idle_init(const std::shared_ptr<Connection> &connection) {
             if(config.timeout_idle>0) {
-                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(*io_service));
+                connection->timer_idle=std::unique_ptr<boost::asio::deadline_timer>(new boost::asio::deadline_timer(connection->socket->get_io_service()));
                 connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(config.timeout_idle)));
                 timer_idle_expired_function(connection);
             }
