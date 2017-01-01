@@ -237,20 +237,7 @@ namespace SimpleWeb {
         
     public:
         virtual void start() {
-            opt_endpoint.clear();
-            for(auto &endp: endpoint) {
-                opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
-                
-                // TODO: remove when onopen, onmessage, etc is removed:
-                if(endp.second.onopen)
-                    endp.second.on_open=endp.second.onopen;
-                if(endp.second.onmessage)
-                    endp.second.on_message=endp.second.onmessage;
-                if(endp.second.onclose)
-                    endp.second.on_close=endp.second.onclose;
-                if(endp.second.onerror)
-                    endp.second.on_error=endp.second.onerror;
-            }
+            update_endpoints();
             
             if(!io_service)
                 io_service=std::make_shared<boost::asio::io_service>();
@@ -287,6 +274,23 @@ namespace SimpleWeb {
             //Wait for the rest of the threads, if any, to finish as well
             for(auto& t: threads) {
                 t.join();
+            }
+        }
+        
+        void update_endpoints() {
+            opt_endpoint.clear();
+            for(auto &endp: endpoint) {
+                opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
+                
+                // TODO: remove when onopen, onmessage, etc is removed:
+                if(endp.second.onopen)
+                    endp.second.on_open=endp.second.onopen;
+                if(endp.second.onmessage)
+                    endp.second.on_message=endp.second.onmessage;
+                if(endp.second.onclose)
+                    endp.second.on_close=endp.second.onclose;
+                if(endp.second.onerror)
+                    endp.second.on_error=endp.second.onerror;
             }
         }
         
@@ -372,8 +376,9 @@ namespace SimpleWeb {
          * The socket's io_service is used, thus running start() is not needed.
          *
          * Example use:
+         * socket_server.update_endpoints();
          * server.on_upgrade=[&socket_server] (auto socket, auto request) {
-         *   auto connection=std::make_shared<Connection>(socket);
+         *   auto connection=std::make_shared<SimpleWeb::SocketServer<SimpleWeb::WS>::Connection>(socket);
          *   connection->method=std::move(request->method);
          *   connection->path=std::move(request->path);
          *   connection->http_version=std::move(request->http_version);
