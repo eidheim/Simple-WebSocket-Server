@@ -241,6 +241,7 @@ namespace SimpleWeb {
             }
         };
     public:
+        /// Warning: do not add or remove endpoints after start() is called
         std::map<regex_comparable, Endpoint> endpoint;
         
     public:
