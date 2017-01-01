@@ -91,7 +91,7 @@ namespace SimpleWeb {
             friend class SocketServer<socket_type>;
             
         public:
-            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
+            Connection(const std::shared_ptr<socket_type> &socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
             
             std::string method, path, http_version;
 
@@ -103,6 +103,8 @@ namespace SimpleWeb {
             unsigned short remote_endpoint_port;
             
         private:
+            Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
+            
             class SendData {
             public:
                 SendData(const std::shared_ptr<SendStream> &header_stream, const std::shared_ptr<SendStream> &message_stream,
@@ -113,8 +115,7 @@ namespace SimpleWeb {
                 std::function<void(const boost::system::error_code)> callback;
             };
             
-            //boost::asio::ssl::stream constructor needs move, until then we store socket as unique_ptr
-            std::unique_ptr<socket_type> socket;
+            std::shared_ptr<socket_type> socket;
             
             boost::asio::strand strand;
             
@@ -371,8 +372,8 @@ namespace SimpleWeb {
          * The socket's io_service is used, thus running start() is not needed.
          *
          * Example use:
-         * server.on_upgrade=[&socket_server] (auto io_service, auto request) {
-         * auto connection=std::make_shared<Connection>(io_service.release());
+         * server.on_upgrade=[&socket_server] (auto socket, auto request) {
+         *   auto connection=std::make_shared<Connection>(socket);
          *   connection->method=std::move(request->method);
          *   connection->path=std::move(request->path);
          *   connection->http_version=std::move(request->http_version);
