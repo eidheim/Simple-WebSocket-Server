@@ -230,14 +230,32 @@ namespace SimpleWeb {
         ///Set before calling start().
         Config config;
         
-        std::map<std::string, Endpoint> endpoint;
-        
     private:
-        std::vector<std::pair<REGEX_NS::regex, Endpoint*> > opt_endpoint;
+        class regex_comparable : public REGEX_NS::regex {
+            std::string regex_string;
+        public:
+            regex_comparable(const char *regex) : std::regex(regex), regex_string(regex) {}
+            regex_comparable(const std::string &regex) : std::regex(regex), regex_string(regex) {}
+            bool operator<(const regex_comparable &rhs) const {
+                return regex_string<rhs.regex_string;
+            }
+        };
+    public:
+        std::map<regex_comparable, Endpoint> endpoint;
         
     public:
         virtual void start() {
-            update_endpoints();
+            for(auto &endp: endpoint) {
+                // TODO: remove when onopen, onmessage, etc is removed:
+                if(endp.second.onopen)
+                    endp.second.on_open=endp.second.onopen;
+                if(endp.second.onmessage)
+                    endp.second.on_message=endp.second.onmessage;
+                if(endp.second.onclose)
+                    endp.second.on_close=endp.second.onclose;
+                if(endp.second.onerror)
+                    endp.second.on_error=endp.second.onerror;
+            }
             
             if(!io_service)
                 io_service=std::make_shared<boost::asio::io_service>();
@@ -274,23 +292,6 @@ namespace SimpleWeb {
             //Wait for the rest of the threads, if any, to finish as well
             for(auto& t: threads) {
                 t.join();
-            }
-        }
-        
-        void update_endpoints() {
-            opt_endpoint.clear();
-            for(auto &endp: endpoint) {
-                opt_endpoint.emplace_back(REGEX_NS::regex(endp.first), &endp.second);
-                
-                // TODO: remove when onopen, onmessage, etc is removed:
-                if(endp.second.onopen)
-                    endp.second.on_open=endp.second.onopen;
-                if(endp.second.onmessage)
-                    endp.second.on_message=endp.second.onmessage;
-                if(endp.second.onclose)
-                    endp.second.on_close=endp.second.onclose;
-                if(endp.second.onerror)
-                    endp.second.on_error=endp.second.onerror;
             }
         }
         
@@ -376,7 +377,6 @@ namespace SimpleWeb {
          * The socket's io_service is used, thus running start() is not needed.
          *
          * Example use:
-         * socket_server.update_endpoints();
          * server.on_upgrade=[&socket_server] (auto socket, auto request) {
          *   auto connection=std::make_shared<SimpleWeb::SocketServer<SimpleWeb::WS>::Connection>(socket);
          *   connection->method=std::move(request->method);
@@ -481,9 +481,9 @@ namespace SimpleWeb {
         
         void write_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer) {
             //Find path- and method-match, and generate response
-            for(auto& endp: opt_endpoint) {
+            for(auto endpoint_it=endpoint.rbegin();endpoint_it!=endpoint.rend();++endpoint_it) {
                 REGEX_NS::smatch path_match;
-                if(REGEX_NS::regex_match(connection->path, path_match, endp.first)) {
+                if(REGEX_NS::regex_match(connection->path, path_match, endpoint_it->first)) {
                     auto write_buffer=std::make_shared<boost::asio::streambuf>();
                     std::ostream handshake(write_buffer.get());
 
@@ -491,14 +491,14 @@ namespace SimpleWeb {
                         connection->path_match=std::move(path_match);
                         //Capture write_buffer in lambda so it is not destroyed before async_write is finished
                         boost::asio::async_write(*connection->socket, *write_buffer, 
-                                [this, connection, write_buffer, read_buffer, &endp]
+                                [this, connection, write_buffer, read_buffer, endpoint_it]
                                 (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
-                                connection_open(connection, *endp.second);
-                                read_message(connection, read_buffer, *endp.second);
+                                connection_open(connection, endpoint_it->second);
+                                read_message(connection, read_buffer, endpoint_it->second);
                             }
                             else
-                                connection_error(connection, *endp.second, ec);
+                                connection_error(connection, endpoint_it->second, ec);
                         });
                     }
                     return;
