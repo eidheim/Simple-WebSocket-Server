@@ -303,7 +303,7 @@ namespace SimpleWeb {
         void handshake() {
             connection->read_remote_endpoint_data();
             
-            std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
+            auto write_buffer=std::make_shared<boost::asio::streambuf>();
             
             std::ostream request(write_buffer.get());
             

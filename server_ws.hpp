@@ -364,6 +364,28 @@ namespace SimpleWeb {
             return all_connections;
         }
         
+        /// Upgrades a request, from for instance Simple-Web-Server, to a WebSocket connection.
+        /// The parameters are moved to the Connection object.
+        /// See also Server::on_upgrade in the Simple-Web-Server project.
+        /// Example use:
+        /// server.on_upgrade=[&socket_server] (...) {
+        ///   socket_server.upgrade(...);
+        /// }
+        /// The socket's io_service is used, thus running start() is not needed.
+        void upgrade(std::unique_ptr<socket_type> &socket, std::string &method, std::string &path, std::string &http_version,
+                     std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> &header) {
+            std::shared_ptr<Connection> connection(new Connection(socket.release()));
+            connection->method=std::move(method);
+            connection->path=std::move(path);
+            connection->http_version=std::move(http_version);
+            connection->header=std::move(header);
+            
+            connection->read_remote_endpoint_data();
+            
+            auto read_buffer=std::make_shared<boost::asio::streambuf>();
+            write_handshake(connection, read_buffer);
+        }
+        
         /// If you have your own boost::asio::io_service, store its pointer here before running start().
         /// You might also want to set config.thread_pool_size to 0.
         std::shared_ptr<boost::asio::io_service> io_service;
@@ -398,7 +420,7 @@ namespace SimpleWeb {
             
             //Create new read_buffer for async_read_until()
             //Shared_ptr is used to pass temporary objects to the asynchronous functions
-            std::shared_ptr<boost::asio::streambuf> read_buffer(new boost::asio::streambuf);
+            auto read_buffer=std::make_shared<boost::asio::streambuf>();
 
             //Set timeout on the following boost::asio::async-read or write function
             auto timer=get_timeout_timer(connection, config.timeout_request);
@@ -455,7 +477,7 @@ namespace SimpleWeb {
             for(auto& endp: opt_endpoint) {
                 REGEX_NS::smatch path_match;
                 if(REGEX_NS::regex_match(connection->path, path_match, endp.first)) {
-                    std::shared_ptr<boost::asio::streambuf> write_buffer(new boost::asio::streambuf);
+                    auto write_buffer=std::make_shared<boost::asio::streambuf>();
                     std::ostream handshake(write_buffer.get());
 
                     if(generate_handshake(connection, handshake)) {
