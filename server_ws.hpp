@@ -160,9 +160,7 @@ namespace SimpleWeb {
                     remote_endpoint_address=socket->lowest_layer().remote_endpoint().address().to_string();
                     remote_endpoint_port=socket->lowest_layer().remote_endpoint().port();
                 }
-                catch(const std::exception& e) {
-                    std::cerr << e.what() << std::endl;
-                }
+                catch(...) {}
             }
         };
         
@@ -231,18 +229,18 @@ namespace SimpleWeb {
         Config config;
         
     private:
-        class regex_comparable : public REGEX_NS::regex {
-            std::string regex_string;
+        class regex_orderable : public REGEX_NS::regex {
+            std::string str;
         public:
-            regex_comparable(const char *regex) : std::regex(regex), regex_string(regex) {}
-            regex_comparable(const std::string &regex) : std::regex(regex), regex_string(regex) {}
-            bool operator<(const regex_comparable &rhs) const {
-                return regex_string<rhs.regex_string;
+            regex_orderable(const char *regex_cstr) : std::regex(regex_cstr), str(regex_cstr) {}
+            regex_orderable(const std::string &regex_str) : std::regex(regex_str), str(regex_str) {}
+            bool operator<(const regex_orderable &rhs) const {
+                return str<rhs.str;
             }
         };
     public:
         /// Warning: do not add or remove endpoints after start() is called
-        std::map<regex_comparable, Endpoint> endpoint;
+        std::map<regex_orderable, Endpoint> endpoint;
         
     public:
         virtual void start() {
