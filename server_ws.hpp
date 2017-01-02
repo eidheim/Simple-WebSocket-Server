@@ -242,7 +242,6 @@ namespace SimpleWeb {
         /// Warning: do not add or remove endpoints after start() is called
         std::map<regex_orderable, Endpoint> endpoint;
         
-    public:
         virtual void start() {
             for(auto &endp: endpoint) {
                 // TODO: remove when onopen, onmessage, etc is removed:
