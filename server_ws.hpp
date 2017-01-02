@@ -480,9 +480,9 @@ namespace SimpleWeb {
         
         void write_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer) {
             //Find path- and method-match, and generate response
-            for(auto &endp: endpoint) {
+            for(auto &regex_endpoint: endpoint) {
                 REGEX_NS::smatch path_match;
-                if(REGEX_NS::regex_match(connection->path, path_match, endp.first)) {
+                if(REGEX_NS::regex_match(connection->path, path_match, regex_endpoint.first)) {
                     auto write_buffer=std::make_shared<boost::asio::streambuf>();
                     std::ostream handshake(write_buffer.get());
 
@@ -490,14 +490,14 @@ namespace SimpleWeb {
                         connection->path_match=std::move(path_match);
                         //Capture write_buffer in lambda so it is not destroyed before async_write is finished
                         boost::asio::async_write(*connection->socket, *write_buffer, 
-                                [this, connection, write_buffer, read_buffer, &endp]
+                                [this, connection, write_buffer, read_buffer, &regex_endpoint]
                                 (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                             if(!ec) {
-                                connection_open(connection, endp.second);
-                                read_message(connection, read_buffer, endp.second);
+                                connection_open(connection, regex_endpoint.second);
+                                read_message(connection, read_buffer, regex_endpoint.second);
                             }
                             else
-                                connection_error(connection, endp.second, ec);
+                                connection_error(connection, regex_endpoint.second, ec);
                         });
                     }
                     return;
