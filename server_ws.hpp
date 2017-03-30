@@ -298,8 +298,14 @@ namespace SimpleWeb {
             if(config.thread_pool_size>0)
                 io_service->stop();
             
-            for(auto& p: endpoint)
-                p.second.connections.clear();
+            for(auto &pair: endpoint) {
+                std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
+                for(auto &connection: pair.second.connections) {
+                    connection->socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+                    connection->socket->lowest_layer().close();
+                }
+                pair.second.connections.clear();
+            }
         }
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
