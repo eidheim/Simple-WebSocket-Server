@@ -192,6 +192,12 @@ namespace SimpleWeb {
             resolver->cancel();
             if(internal_io_service)
                 io_service->stop();
+            
+            if(connection) {
+                boost::system::error_code ec;
+                connection->socket->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+                connection->socket->lowest_layer().close();
+            }
         }
         
         ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
