@@ -99,7 +99,7 @@ int main() {
             *send_stream << message_str;
             
             //server.send is an asynchronous function
-            server.send(a_connection, send_stream, message->fin_rsv_opcode);
+            server.send(a_connection, send_stream, nullptr, message->fin_rsv_opcode);
         }
     };
     
