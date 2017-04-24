@@ -39,7 +39,7 @@ int main() {
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
                         "Error: " << ec << ", error message: " << ec.message() << endl;
             }
-        });
+        }, message->fin_rsv_opcode);
     };
     
     echo.on_open=[](shared_ptr<WsServer::Connection> connection) {
@@ -99,7 +99,7 @@ int main() {
             *send_stream << message_str;
             
             //server.send is an asynchronous function
-            server.send(a_connection, send_stream);
+            server.send(a_connection, send_stream, message->fin_rsv_opcode);
         }
     };
     
