@@ -58,7 +58,9 @@ int main() {
     };
     
     //Example 2: Echo thrice
-    //  Send a received message three times back to the client
+    //  Demonstrating queuing of messages by sending a received message three times back to the client.
+    //  send_stream2 is automatically queued by the library after the first send call,
+    //  and send_stream3 is queued after the first send call through its callback
     //  Test with the following JavaScript:
     //    var ws=new WebSocket("ws://localhost:8080/echo_thrice");
     //    ws.onmessage=function(evt){console.log(evt.data);};
