@@ -1,0 +1,15 @@
+local_settings:
+    cppan_dir: cppan
+
+dependencies:
+  # remove the next line if you need only tesseract dependency
+  # e.g. when using other image library - opencv or something else
+  pvt.cppan.demo.boost.system: 1
+  pvt.cppan.demo.boost.coroutine: 1
+  pvt.cppan.demo.boost.context: 1
+  pvt.cppan.demo.boost.thread: 1
+  
+  pvt.cppan.demo.openssl.crypto: 1
+  pvt.cppan.demo.openssl.ssl: 1
+  # cant use it since require opencv_contrib modules
+  # pvt.cppan.demo.intel.opencv: 3.1.0
