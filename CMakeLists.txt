@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.2)
 project (Simple-WebSocket-Server)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 
@@ -7,7 +7,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 if (WIN32)
 	MESSAGE(STATUS "Entering Win32 Mode")
 	add_subdirectory(cppan)
-	SET(DEP_LIBS ${cppan})
+	SET(DEP_LIBS pvt.cppan.demo.boost.system
+  pvt.cppan.demo.boost.coroutine
+  pvt.cppan.demo.boost.context
+  pvt.cppan.demo.boost.thread
+  pvt.cppan.demo.openssl.crypto
+  pvt.cppan.demo.openssl.ssl)
 	MESSAGE(STATUS "DEP_LIBS: ${DEP_LIBS}")
 
 ELSE()
