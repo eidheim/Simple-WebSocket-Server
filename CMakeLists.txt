@@ -11,6 +11,7 @@ if (WIN32)
   pvt.cppan.demo.boost.coroutine
   pvt.cppan.demo.boost.context
   pvt.cppan.demo.boost.thread
+  pvt.cppan.demo.boost.asio
   pvt.cppan.demo.openssl.crypto
   pvt.cppan.demo.openssl.ssl)
 	MESSAGE(STATUS "DEP_LIBS: ${DEP_LIBS}")

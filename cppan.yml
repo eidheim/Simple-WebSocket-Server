@@ -11,5 +11,6 @@ dependencies:
   
   pvt.cppan.demo.openssl.crypto: 1
   pvt.cppan.demo.openssl.ssl: 1
+  pvt.cppan.demo.boost.asio: 1
   # cant use it since require opencv_contrib modules
   # pvt.cppan.demo.intel.opencv: 3.1.0

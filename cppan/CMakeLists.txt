@@ -102,12 +102,16 @@ include(helpers.cmake)
 
 cppan_debug_message("Section: direct dependencies")
 
+set(pvt_cppan_demo_boost_asio_DIR C:/Users/funk_eu/.cppan/storage/src/45/94/dadc)
 set(pvt_cppan_demo_boost_context_DIR C:/Users/funk_eu/.cppan/storage/src/5a/c9/3e02)
 set(pvt_cppan_demo_boost_coroutine_DIR C:/Users/funk_eu/.cppan/storage/src/e6/29/090a)
 set(pvt_cppan_demo_boost_system_DIR C:/Users/funk_eu/.cppan/storage/src/d6/90/a846)
 set(pvt_cppan_demo_boost_thread_DIR C:/Users/funk_eu/.cppan/storage/src/34/de/c49f)
 set(pvt_cppan_demo_openssl_crypto_DIR C:/Users/funk_eu/.cppan/storage/src/01/02/7274)
 set(pvt_cppan_demo_openssl_ssl_DIR C:/Users/funk_eu/.cppan/storage/src/12/9a/e40b)
+
+# pvt.cppan.demo.boost.asio-1.64.0
+cppan_include("C:/Users/funk_eu/.cppan/storage/src/45/94/dadc/include.cmake")
 
 ################################################################################
 #
@@ -155,6 +159,7 @@ cppan_debug_message("Section: main library")
 
 add_library                   (__cppan INTERFACE)
 target_link_libraries         (__cppan
+    INTERFACE pvt.cppan.demo.boost.asio-1.64.0
     INTERFACE pvt.cppan.demo.boost.context-1.64.0
     INTERFACE pvt.cppan.demo.boost.coroutine-1.64.0
     INTERFACE pvt.cppan.demo.boost.system-1.64.0
