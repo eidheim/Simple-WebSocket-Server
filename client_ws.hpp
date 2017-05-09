@@ -272,16 +272,16 @@ namespace SimpleWeb {
         /// If you have your own boost::asio::io_service, store its pointer here before running start().
         std::shared_ptr<boost::asio::io_service> io_service;
     protected:
-        const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        const std::string ws_magic_string;
         
-        bool internal_io_service=false;
+        bool internal_io_service;
         std::unique_ptr<boost::asio::ip::tcp::resolver> resolver;
         
         std::string host;
         unsigned short port;
         std::string path;
                 
-        SocketClientBase(const std::string& host_port_path, unsigned short default_port) {
+        SocketClientBase(const std::string& host_port_path, unsigned short default_port):internal_io_service(false), ws_magic_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11") {
             size_t host_end=host_port_path.find(':');
             size_t host_port_end=host_port_path.find('/');
             if(host_end==std::string::npos) {

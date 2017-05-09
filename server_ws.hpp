@@ -209,21 +209,21 @@ namespace SimpleWeb {
         class Config {
             friend class SocketServerBase<socket_type>;
         private:
-            Config(unsigned short port): port(port) {}
+            Config(unsigned short port): port(port), thread_pool_size(1), timeout_request(5), timeout_idle(0), reuse_address(true) {}
         public:
             /// Port number to use. Defaults to 80 for HTTP and 443 for HTTPS.
             unsigned short port;
             /// Number of threads that the server will use when start() is called. Defaults to 1 thread.
-            size_t thread_pool_size=1;
+            size_t thread_pool_size;
             /// Timeout on request handling. Defaults to 5 seconds.
-            size_t timeout_request=5;
+            size_t timeout_request;
             /// Idle timeout. Defaults to no timeout.
-            size_t timeout_idle=0;
+            size_t timeout_idle;
             /// IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
             /// If empty, the address will be any address.
             std::string address;
             /// Set to false to avoid binding the socket to an address that is already in use. Defaults to true.
-            bool reuse_address=true;
+            bool reuse_address;
         };
         ///Set before calling start().
         Config config;
@@ -401,13 +401,13 @@ namespace SimpleWeb {
         /// You might also want to set config.thread_pool_size to 0.
         std::shared_ptr<boost::asio::io_service> io_service;
     protected:
-        const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        const std::string ws_magic_string;
         
         std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor;
         
         std::vector<std::thread> threads;
         
-        SocketServerBase(unsigned short port) : config(port) {}
+        SocketServerBase(unsigned short port) : config(port), ws_magic_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11") {}
         
         virtual void accept()=0;
         
@@ -733,13 +733,7 @@ namespace SimpleWeb {
     template<>
     class SocketServer<WS> : public SocketServerBase<WS> {
     public:
-        DEPRECATED SocketServer(unsigned short port, size_t thread_pool_size=1, size_t timeout_request=5, size_t timeout_idle=0) : 
-                SocketServer() {
-            config.port=port;
-            config.thread_pool_size=thread_pool_size;
-            config.timeout_request=timeout_request;
-            config.timeout_idle=timeout_idle;
-        };
+        
         
         SocketServer() : SocketServerBase<WS>(80) {}
         
