@@ -129,8 +129,15 @@ namespace SimpleWeb {
                                     strand.wrap([this, connection]
                                     (const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                                 auto send_queued=send_queue.begin();
-                                if(send_queued->callback)
-                                    send_queued->callback(ec);
+#if !(_MSC_VER == 1700)
+								// ... Do if not  VC11/Visual Studio 2012 specific stuff
+								if(send_queued->callback)
+									send_queued->callback(ec);
+#else
+	#if _DEBUG
+								std::cout << __FILE__ << ": " << __LINE__ << "\nCallbacks for sending data are not supported under Visual Studio 2012.... :( \n";
+	#endif
+#endif
                                 if(!ec) {
                                     send_queue.erase(send_queued);
                                     if(send_queue.size()>0)
