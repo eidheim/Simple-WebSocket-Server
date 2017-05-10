@@ -102,7 +102,6 @@ namespace SimpleWeb {
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
-        private:
             Connection(socket_type *socket): socket(socket), strand(socket->get_io_service()), closed(false) {}
             
             class SendData {
@@ -185,22 +184,23 @@ namespace SimpleWeb {
         
         class Endpoint {
             friend class SocketServerBase<socket_type>;
-        private:
+        public:
+			Endpoint(){}; //test if vs2012 compiles. this doesnt make sense... and may break everything.
+			Endpoint(const Endpoint & a ){}//=delete;
             std::unordered_set<std::shared_ptr<Connection> > connections;
             std::mutex connections_mutex;
 
-        public:
-            DEPRECATED std::function<void(std::shared_ptr<Connection>)> onopen;
+            //DEPRECATED std::function<void(std::shared_ptr<Connection>)> onopen;
             std::function<void(std::shared_ptr<Connection>)> on_open;
-            DEPRECATED std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
+            //DEPRECATED std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
             std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
-            DEPRECATED std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
+            //DEPRECATED std::function<void(std::shared_ptr<Connection>, int, const std::string&)> onclose;
             std::function<void(std::shared_ptr<Connection>, int, const std::string&)> on_close;
-            DEPRECATED std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
+            //DEPRECATED std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> onerror;
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> on_error;
             
             std::unordered_set<std::shared_ptr<Connection> > get_connections() {
-                std::lock_guard<std::mutex> lock(connections_mutex);
+                std::lock_guard<mutex> lock(connections_mutex);
                 auto copy=connections;
                 return copy;
             }
@@ -230,8 +230,11 @@ namespace SimpleWeb {
         
     private:
         class regex_orderable : public REGEX_NS::regex {
-            std::string str;
+            
         public:
+			std::string str;
+			regex_orderable():REGEX_NS::regex(""){}; //test if vs2012 compiles. this doesnt make sense... and may break everything.
+			regex_orderable(const regex_orderable & other):REGEX_NS::regex(other), str(other.str){}//.str.c_str()){}
             regex_orderable(const char *regex_cstr) : REGEX_NS::regex(regex_cstr), str(regex_cstr) {}
             regex_orderable(const std::string &regex_str) : REGEX_NS::regex(regex_str), str(regex_str) {}
             bool operator<(const regex_orderable &rhs) const {
@@ -240,19 +243,12 @@ namespace SimpleWeb {
         };
     public:
         /// Warning: do not add or remove endpoints after start() is called
+		//regex_orderable test;
         std::map<regex_orderable, Endpoint> endpoint;
         
         virtual void start() {
             for(auto &endp: endpoint) {
-                // TODO: remove when onopen, onmessage, etc is removed:
-                if(endp.second.onopen)
-                    endp.second.on_open=endp.second.onopen;
-                if(endp.second.onmessage)
-                    endp.second.on_message=endp.second.onmessage;
-                if(endp.second.onclose)
-                    endp.second.on_close=endp.second.onclose;
-                if(endp.second.onerror)
-                    endp.second.on_error=endp.second.onerror;
+                
             }
             
             if(!io_service)
