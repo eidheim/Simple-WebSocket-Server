@@ -104,8 +104,21 @@ namespace SimpleWeb {
                     boost::asio::async_write(*socket, send_queue.begin()->send_stream->streambuf,
                             strand.wrap([this](const boost::system::error_code& ec, size_t /*bytes_transferred*/) {
                         auto send_queued=send_queue.begin();
-                        if(send_queued->callback)
+						//crapppy shit in VS2012...
+						//a bug returns always true if checked for empty
+						//http://stackoverflow.com/questions/28948587/vs2012-stdfunction-operator-bool-returns-true-unexpectedly
+						//and official: https://connect.microsoft.com/VisualStudio/feedback/details/779047
+						
+#if !(_MSC_VER == 1700)
+						// ... Do if not  VC11/Visual Studio 2012 specific stuff
+						if(send_queued->callback)
                             send_queued->callback(ec);
+#else
+	#if _DEBUG
+						std::cout << __FILE__ << ": " << __LINE__ << "\nCallbacks for sending data are not supported under Visual Studio 2012.... :( \n";
+	#endif
+#endif
+						
                         if(!ec) {
                             send_queue.erase(send_queued);
                             if(send_queue.size()>0)
@@ -244,6 +257,8 @@ namespace SimpleWeb {
             for(size_t c=0;c<length;c++) {
                 send_stream->put(message_stream->get()^mask[c%4]);
             }
+
+			
             
             connection->strand.post([this, send_stream, callback]() {
                 connection->send_queue.emplace_back(send_stream, callback);
@@ -272,16 +287,16 @@ namespace SimpleWeb {
         /// If you have your own boost::asio::io_service, store its pointer here before running start().
         std::shared_ptr<boost::asio::io_service> io_service;
     protected:
-        const std::string ws_magic_string="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        const std::string ws_magic_string;
         
-        bool internal_io_service=false;
+        bool internal_io_service;
         std::unique_ptr<boost::asio::ip::tcp::resolver> resolver;
         
         std::string host;
         unsigned short port;
         std::string path;
                 
-        SocketClientBase(const std::string& host_port_path, unsigned short default_port) {
+        SocketClientBase(const std::string& host_port_path, unsigned short default_port):internal_io_service(false), ws_magic_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11") {
             size_t host_end=host_port_path.find(':');
             size_t host_port_end=host_port_path.find('/');
             if(host_end==std::string::npos) {

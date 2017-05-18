@@ -38,6 +38,25 @@ make
 cd ..
 ```
 
+### Windows
+
+
+Prerequisites:
+
+1. Download git, cmake and add them to PATH
+2. Download the latest CPPAN (https://cppan.org/) client from https://cppan.org/client/
+3. Add cppan to PATH too.
+4. Install VS215 Redist in order to use cppan
+
+In the project root call:
+
+```
+cppan
+mkdir build && cd build
+cmake -G "Visual Studio 14 2015 Win64" ..
+```
+
+
 #### Run server and client examples
 
 ### WS

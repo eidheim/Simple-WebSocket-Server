@@ -39,21 +39,21 @@ int main() {
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
                         "Error: " << ec << ", error message: " << ec.message() << endl;
             }
-        });
+        }, message->fin_rsv_opcode);
     };
     
     echo.on_open=[](shared_ptr<WsServer::Connection> connection) {
-        cout << "Server: Opened connection " << (size_t)connection.get() << endl;
+        cout << "Server (echo/): Opened connection " << (size_t)connection.get() << endl;
     };
     
     //See RFC 6455 7.4.1. for status codes
     echo.on_close=[](shared_ptr<WsServer::Connection> connection, int status, const string& /*reason*/) {
-        cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
+        cout << "Server (echo/): Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
     echo.on_error=[](shared_ptr<WsServer::Connection> connection, const boost::system::error_code& ec) {
-        cout << "Server: Error in connection " << (size_t)connection.get() << ". " << 
+        cout << "Server (echo/): Error in connection " << (size_t)connection.get() << ". " << 
                 "Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
@@ -101,7 +101,7 @@ int main() {
             *send_stream << message_str;
             
             //server.send is an asynchronous function
-            server.send(a_connection, send_stream);
+            server.send(a_connection, send_stream, nullptr, message->fin_rsv_opcode);
         }
     };
     
@@ -135,10 +135,10 @@ int main() {
     };
     
     client.on_open=[&client]() {
-        cout << "Client: Opened connection" << endl;
+        cout << "Client /echo/: Opened connection" << endl;
         
         string message="Hello";
-        cout << "Client: Sending message: \"" << message << "\"" << endl;
+        cout << "Client /echo/: on_open, Sending message: \"" << message << "\"" << endl;
 
         auto send_stream=make_shared<WsClient::SendStream>();
         *send_stream << message;
