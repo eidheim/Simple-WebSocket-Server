@@ -118,6 +118,18 @@ public:
 };
 
 int main() {
+    assert(case_insensitive_equal("Test", "tesT"));
+    assert(case_insensitive_equal("tesT", "test"));
+    assert(!case_insensitive_equal("test", "tseT"));
+    CaseInsensitiveEqual equal;
+    assert(equal("Test", "tesT"));
+    assert(equal("tesT", "test"));
+    assert(!equal("test", "tset"));
+    CaseInsensitiveHash hash;
+    assert(hash("Test")==hash("tesT"));
+    assert(hash("tesT")==hash("test"));
+    assert(hash("test")!=hash("tset"));
+    
     SocketServerTest serverTest;
     serverTest.io_service=std::make_shared<boost::asio::io_service>();
     

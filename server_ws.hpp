@@ -17,33 +17,46 @@
 #include <atomic>
 #include <iostream>
 
-#ifndef CASE_INSENSITIVE_EQUALS_AND_HASH
-#define CASE_INSENSITIVE_EQUALS_AND_HASH
-//Based on http://www.boost.org/doc/libs/1_60_0/doc/html/unordered/hash_equality.html
-class case_insensitive_equals {
-public:
-  bool operator()(const std::string &key1, const std::string &key2) const {
-    return boost::algorithm::iequals(key1, key2);
-  }
-};
-class case_insensitive_hash {
-public:
-  size_t operator()(const std::string &key) const {
-    std::size_t seed=0;
-    for(auto &c: key)
-      boost::hash_combine(seed, std::tolower(c));
-    return seed;
-  }
-};
-#endif
+# ifndef CASE_INSENSITIVE_EQUAL_AND_HASH
+# define CASE_INSENSITIVE_EQUAL_AND_HASH
+namespace SimpleWeb {
+    inline bool case_insensitive_equal(const std::string &str1, const std::string &str2) {
+        return str1.size() == str2.size() &&
+               std::equal(str1.begin(), str1.end(), str2.begin(), [](char a, char b) {
+                   return tolower(a) == tolower(b);
+               });
+    }
+    class CaseInsensitiveEqual {
+    public:
+        bool operator()(const std::string &str1, const std::string &str2) const {
+            return case_insensitive_equal(str1, str2);
+        }
+    };
+    // Based on https://stackoverflow.com/questions/2590677/how-do-i-combine-hash-values-in-c0x/2595226#2595226
+    class CaseInsensitiveHash {
+    public:
+        size_t operator()(const std::string &str) const {
+            size_t h = 0;
+            std::hash<int> hash;
+            for (auto c : str)
+                h ^= hash(tolower(c)) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+}
+# endif
 
 // Late 2017 TODO: remove the following checks and always use std::regex
 #ifdef USE_BOOST_REGEX
 #include <boost/regex.hpp>
-#define REGEX_NS boost
+namespace SimpleWeb {
+    namespace regex = boost;
+}
 #else
 #include <regex>
-#define REGEX_NS std
+namespace SimpleWeb {
+    namespace regex = std;
+}
 #endif
 
 // TODO when switching to c++14, use [[deprecated]] instead
@@ -95,9 +108,9 @@ namespace SimpleWeb {
             
             std::string method, path, http_version;
 
-            std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> header;
+            std::unordered_multimap<std::string, std::string, CaseInsensitiveHash, CaseInsensitiveEqual> header;
 
-            REGEX_NS::smatch path_match;
+            regex::smatch path_match;
             
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
@@ -229,11 +242,11 @@ namespace SimpleWeb {
         Config config;
         
     private:
-        class regex_orderable : public REGEX_NS::regex {
+        class regex_orderable : public regex::regex {
             std::string str;
         public:
-            regex_orderable(const char *regex_cstr) : REGEX_NS::regex(regex_cstr), str(regex_cstr) {}
-            regex_orderable(const std::string &regex_str) : REGEX_NS::regex(regex_str), str(regex_str) {}
+            regex_orderable(const char *regex_cstr) : regex::regex(regex_cstr), str(regex_cstr) {}
+            regex_orderable(const std::string &regex_str) : regex::regex(regex_str), str(regex_str) {}
             bool operator<(const regex_orderable &rhs) const {
                 return str<rhs.str;
             }
@@ -486,8 +499,8 @@ namespace SimpleWeb {
         void write_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<boost::asio::streambuf> &read_buffer) {
             //Find path- and method-match, and generate response
             for(auto &regex_endpoint: endpoint) {
-                REGEX_NS::smatch path_match;
-                if(REGEX_NS::regex_match(connection->path, path_match, regex_endpoint.first)) {
+                regex::smatch path_match;
+                if(regex::regex_match(connection->path, path_match, regex_endpoint.first)) {
                     auto write_buffer=std::make_shared<boost::asio::streambuf>();
                     std::ostream handshake(write_buffer.get());
 

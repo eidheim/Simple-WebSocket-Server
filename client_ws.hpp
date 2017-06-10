@@ -13,25 +13,34 @@
 #include <atomic>
 #include <list>
 
-#ifndef CASE_INSENSITIVE_EQUALS_AND_HASH
-#define CASE_INSENSITIVE_EQUALS_AND_HASH
-//Based on http://www.boost.org/doc/libs/1_60_0/doc/html/unordered/hash_equality.html
-class case_insensitive_equals {
-public:
-  bool operator()(const std::string &key1, const std::string &key2) const {
-    return boost::algorithm::iequals(key1, key2);
-  }
-};
-class case_insensitive_hash {
-public:
-  size_t operator()(const std::string &key) const {
-    std::size_t seed=0;
-    for(auto &c: key)
-      boost::hash_combine(seed, std::tolower(c));
-    return seed;
-  }
-};
-#endif
+# ifndef CASE_INSENSITIVE_EQUAL_AND_HASH
+# define CASE_INSENSITIVE_EQUAL_AND_HASH
+namespace SimpleWeb {
+    inline bool case_insensitive_equal(const std::string &str1, const std::string &str2) {
+        return str1.size() == str2.size() &&
+               std::equal(str1.begin(), str1.end(), str2.begin(), [](char a, char b) {
+                   return tolower(a) == tolower(b);
+               });
+    }
+    class CaseInsensitiveEqual {
+    public:
+        bool operator()(const std::string &str1, const std::string &str2) const {
+            return case_insensitive_equal(str1, str2);
+        }
+    };
+    // Based on https://stackoverflow.com/questions/2590677/how-do-i-combine-hash-values-in-c0x/2595226#2595226
+    class CaseInsensitiveHash {
+    public:
+        size_t operator()(const std::string &str) const {
+            size_t h = 0;
+            std::hash<int> hash;
+            for (auto c : str)
+                h ^= hash(tolower(c)) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+}
+# endif
 
 // TODO: remove when onopen, onmessage, etc is removed
 #ifndef DEPRECATED
@@ -78,7 +87,7 @@ namespace SimpleWeb {
             friend class SocketClient<socket_type>;
 
         public:
-            std::unordered_multimap<std::string, std::string, case_insensitive_hash, case_insensitive_equals> header;
+            std::unordered_multimap<std::string, std::string, CaseInsensitiveHash, CaseInsensitiveEqual> header;
             std::string remote_endpoint_address;
             unsigned short remote_endpoint_port;
             
