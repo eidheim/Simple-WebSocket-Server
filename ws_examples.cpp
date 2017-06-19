@@ -93,16 +93,34 @@ int main() {
     //    ws.send("test");
     auto& echo_all=server.endpoint["^/echo_all/?$"];
     echo_all.on_message=[&server](shared_ptr<WsServer::Connection> /*connection*/, shared_ptr<WsServer::Message> message) {
+		
         auto message_str=message->string();
+		//message->binary
+		cout << "Server (echo_all/) received message of length " << message->size() << "\n";
         
         //echo_all.get_connections() can also be used to solely receive connections on this endpoint
         for(auto a_connection: server.get_connections()) {
             auto send_stream=make_shared<WsServer::SendStream>();
             *send_stream << message_str;
+			//*send_stream << message->rdbuf();
+			/*copy_n( istreambuf_iterator<char>(*message),
+				message->size(),
+				ostreambuf_iterator<char>(*send_stream)
+			);*/
             
             //server.send is an asynchronous function
             server.send(a_connection, send_stream, nullptr, message->fin_rsv_opcode);
         }
+    };
+
+	echo_all.on_open=[](shared_ptr<WsServer::Connection> connection) {
+        cout << "Server (echo_all/): Opened connection " << (size_t)connection.get() << endl;
+    };
+
+	//See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
+    echo_all.on_error=[](shared_ptr<WsServer::Connection> connection, const boost::system::error_code& ec) {
+        cout << "Server (echo_all/): Error in connection " << (size_t)connection.get() << ". " << 
+                "Error: " << ec << ", error message: " << ec.message() << endl;
     };
     
     thread server_thread([&server](){
