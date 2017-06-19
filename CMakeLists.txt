@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.2)
 project (Simple-WebSocket-Server)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
-
+option(USE_SSL "Uses OpenSSL" OFF)
 
 #if windows is used, use cppan. the dependencies are declared in cppan.yml
 if (WIN32)
@@ -33,9 +33,12 @@ ELSE()
 	  set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
 	endif()
 
-	find_package(OpenSSL REQUIRED)
-	MESSAGE(STATUS "OPENSSL: ${OPENSSL_LIBRARIES}")
-	include_directories(${OPENSSL_INCLUDE_DIR})
+	if(USE_SSL)
+		find_package(OpenSSL REQUIRED)
+		MESSAGE(STATUS "OPENSSL: ${OPENSSL_LIBRARIES}")
+		include_directories(${OPENSSL_INCLUDE_DIR})
+	ENDIF(USE_SSL)
+	
 	SET(DEP_LIBS ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${OPENSSL_CRYPTO_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
 
@@ -49,12 +52,16 @@ include_directories(.)
 add_executable(ws_examples ws_examples.cpp)
 target_link_libraries(ws_examples ${CMAKE_THREAD_LIBS_INIT} ${DEP_LIBS})
 
-add_executable(wss_examples wss_examples.cpp)
-target_link_libraries(wss_examples ${CMAKE_THREAD_LIBS_INIT} ${DEP_LIBS})
+if(USE_SSL)
+	add_executable(wss_examples wss_examples.cpp)
+	target_link_libraries(wss_examples ${CMAKE_THREAD_LIBS_INIT} ${DEP_LIBS})
+endif(USE_SSL)
 
 if(MSYS)
     target_link_libraries(ws_examples ws2_32 wsock32)
-    target_link_libraries(wss_examples ws2_32 wsock32)
+    if(USE_SSL)
+    	target_link_libraries(wss_examples ws2_32 wsock32)
+    endif(USE_SSL)
 endif()
 
 enable_testing()

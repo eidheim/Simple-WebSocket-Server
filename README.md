@@ -56,6 +56,14 @@ mkdir build && cd build
 cmake -G "Visual Studio 14 2015 Win64" ..
 ```
 
+### Linux
+
+Install:
+
+* libboost-dev libboost-thread-dev libboost-system-dev libboost-coroutine-dev libbost-context-dev
+* libssl-dev
+* cmake
+* build-essentials
 
 #### Run server and client examples
 
