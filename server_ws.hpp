@@ -207,7 +207,7 @@ namespace SimpleWeb {
             std::function<void(std::shared_ptr<Connection>, const boost::system::error_code&)> on_error;
             
             std::unordered_set<std::shared_ptr<Connection> > get_connections() {
-                std::lock_guard<mutex> lock(connections_mutex);
+                std::lock_guard<std::mutex> lock(connections_mutex);
                 auto copy=connections;
                 return copy;
             }
