@@ -24,7 +24,7 @@ int main() {
         ++server_callback_count;
         auto send_stream=make_shared<WsServer::SendStream>();
         *send_stream << message_str;
-        server.send(connection, send_stream, [](const boost::system::error_code& ec){
+        server.send(connection, send_stream, [](const SimpleWeb::error_code& ec){
             if(ec) {
                 cerr << ec.message() << endl;
                 assert(false);
@@ -40,7 +40,7 @@ int main() {
         ++server_callback_count;
     };
     
-    echo.on_error=[](shared_ptr<WsServer::Connection> /*connection*/, const boost::system::error_code& ec) {
+    echo.on_error=[](shared_ptr<WsServer::Connection> /*connection*/, const SimpleWeb::error_code& ec) {
         cerr << ec.message() << endl;
         assert(false);
     };
@@ -51,7 +51,7 @@ int main() {
         
         auto send_stream1=make_shared<WsServer::SendStream>();
         *send_stream1 << message_str;
-        server.send(connection, send_stream1, [&server, connection, message_str](const boost::system::error_code& ec) {
+        server.send(connection, send_stream1, [&server, connection, message_str](const SimpleWeb::error_code& ec) {
             if(!ec) {
                 auto send_stream3=make_shared<WsServer::SendStream>();
                 *send_stream3 << message_str;
@@ -95,7 +95,7 @@ int main() {
             ++client_callback_count;
         };
         
-        client.on_error=[](const boost::system::error_code& ec) {
+        client.on_error=[](const SimpleWeb::error_code& ec) {
             cerr << ec.message() << endl;
             assert(false);
         };
@@ -137,7 +137,7 @@ int main() {
             ++client_callback_count;
         };
         
-        client.on_error=[](const boost::system::error_code& ec) {
+        client.on_error=[](const SimpleWeb::error_code& ec) {
             cerr << ec.message() << endl;
             assert(false);
         };

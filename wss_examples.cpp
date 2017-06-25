@@ -33,7 +33,7 @@ int main() {
         auto send_stream=make_shared<WssServer::SendStream>();
         *send_stream << message_str;
         //server.send is an asynchronous function
-        server.send(connection, send_stream, [](const boost::system::error_code& ec){
+        server.send(connection, send_stream, [](const SimpleWeb::error_code& ec){
             if(ec) {
                 cout << "Server: Error sending message. " <<
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
@@ -52,7 +52,7 @@ int main() {
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    echo.on_error=[](shared_ptr<WssServer::Connection> connection, const boost::system::error_code& ec) {
+    echo.on_error=[](shared_ptr<WssServer::Connection> connection, const SimpleWeb::error_code& ec) {
         cout << "Server: Error in connection " << (size_t)connection.get() << ". " << 
                 "Error: " << ec << ", error message: " << ec.message() << endl;
     };
@@ -72,7 +72,7 @@ int main() {
         auto send_stream1=make_shared<WssServer::SendStream>();
         *send_stream1 << message_str;
         //server.send is an asynchronous function
-        server.send(connection, send_stream1, [&server, connection, message_str](const boost::system::error_code& ec) {
+        server.send(connection, send_stream1, [&server, connection, message_str](const SimpleWeb::error_code& ec) {
             if(!ec) {
                 auto send_stream3=make_shared<WssServer::SendStream>();
                 *send_stream3 << message_str;
@@ -151,7 +151,7 @@ int main() {
     };
     
     //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-    client.on_error=[](const boost::system::error_code& ec) {
+    client.on_error=[](const SimpleWeb::error_code& ec) {
         cout << "Client: Error: " << ec << ", error message: " << ec.message() << endl;
     };
     

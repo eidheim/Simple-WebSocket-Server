@@ -131,7 +131,7 @@ int main() {
     assert(hash("test")!=hash("tset"));
     
     SocketServerTest serverTest;
-    serverTest.io_service=std::make_shared<boost::asio::io_service>();
+    serverTest.io_service=std::make_shared<asio::io_service>();
     
     serverTest.parse_request_test();
     
@@ -145,7 +145,7 @@ int main() {
     clientTest3.constructor_parse_test3();
     
     SocketClientTest clientTest4("test.org:8080");
-    clientTest4.io_service=std::make_shared<boost::asio::io_service>();
+    clientTest4.io_service=std::make_shared<asio::io_service>();
     clientTest4.constructor_parse_test4();
     
     clientTest4.parse_response_header_test();
