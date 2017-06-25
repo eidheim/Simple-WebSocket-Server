@@ -16,7 +16,7 @@ script:
       rm -r * &&
       CXX=g++ cmake .. &&
       make &&
-      CTEST_OUTPUT_ON_FAILURE=1 make test
+      CTEST_OUTPUT_ON_FAILURE=1 make test &&
       rm -r * &&
       CXX=g++ cmake -DCMAKE_CXX_FLAGS=\"-DUSE_STANDALONE_ASIO\" .. &&
       make &&
