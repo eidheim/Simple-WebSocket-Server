@@ -71,11 +71,9 @@ namespace SimpleWeb {
           asio::ip::tcp::no_delay option(true);
           connection->socket->lowest_layer().set_option(option);
 
-          //Set timeout on the following asio::ssl::stream::async_handshake
-          auto timer = get_timeout_timer(connection, config.timeout_request);
-          connection->socket->async_handshake(asio::ssl::stream_base::server, [this, connection, timer](const error_code &ec) {
-            if(timer)
-              timer->cancel();
+          connection->set_timeout(config.timeout_request);
+          connection->socket->async_handshake(asio::ssl::stream_base::server, [this, connection](const error_code &ec) {
+            connection->cancel_timeout();
             if(!ec)
               read_handshake(connection);
           });

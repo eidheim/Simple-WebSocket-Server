@@ -73,6 +73,10 @@ namespace SimpleWeb {
     private:
       Connection(socket_type *socket) : socket(socket), strand(socket->get_io_service()), closed(false) {}
 
+      std::unique_ptr<socket_type> socket;
+
+      asio::strand strand;
+
       class SendData {
       public:
         SendData(const std::shared_ptr<SendStream> &send_stream, const std::function<void(const error_code)> &callback)
@@ -80,10 +84,6 @@ namespace SimpleWeb {
         std::shared_ptr<SendStream> send_stream;
         std::function<void(const error_code)> callback;
       };
-
-      std::unique_ptr<socket_type> socket;
-
-      asio::strand strand;
 
       std::list<SendData> send_queue;
 

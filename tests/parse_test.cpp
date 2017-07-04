@@ -15,7 +15,7 @@ public:
   void parse_request_test() {
     std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
 
-    stringstream ss;
+    ostream ss(&connection->read_buffer);
     ss << "GET /test/ HTTP/1.1\r\n";
     ss << "TestHeader: test\r\n";
     ss << "TestHeader2:test2\r\n";
@@ -23,7 +23,7 @@ public:
     ss << "TestHeader3:test3b\r\n";
     ss << "\r\n";
 
-    parse_handshake(connection, ss);
+    parse_handshake(connection);
 
     assert(connection->method == "GET");
     assert(connection->path == "/test/");
