@@ -74,25 +74,32 @@ int main() {
     WsClient client("localhost:8080/echo");
 
     atomic<int> client_callback_count(0);
+    atomic<bool> closed(false);
 
-    client.on_message = [&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
 
+      assert(!closed);
+
       client.send_close(1000);
     };
 
-    client.on_open = [&client, &client_callback_count]() {
+    client.on_open = [&]() {
       ++client_callback_count;
+
+      assert(!closed);
 
       auto send_stream = make_shared<WsClient::SendStream>();
       *send_stream << "Hello";
       client.send(send_stream);
     };
 
-    client.on_close = [&client_callback_count](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
+      assert(!closed);
+      closed = true;
     };
 
     client.on_error = [](const SimpleWeb::error_code &ec) {
@@ -104,8 +111,8 @@ int main() {
       client.start();
     });
 
-    while(client_callback_count < 3)
-      this_thread::sleep_for(chrono::milliseconds(10));
+    while(!closed)
+      this_thread::sleep_for(chrono::milliseconds(5));
 
     client.stop();
     client_thread.join();
@@ -118,26 +125,33 @@ int main() {
     WsClient client("localhost:8080/echo_thrice");
 
     atomic<int> client_callback_count(0);
+    atomic<bool> closed(false);
 
-    client.on_message = [&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
+
+      assert(!closed);
 
       if(client_callback_count == 4)
         client.send_close(1000);
     };
 
-    client.on_open = [&client, &client_callback_count]() {
+    client.on_open = [&]() {
       ++client_callback_count;
+
+      assert(!closed);
 
       auto send_stream = make_shared<WsClient::SendStream>();
       *send_stream << "Hello";
       client.send(send_stream);
     };
 
-    client.on_close = [&client_callback_count](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
+      assert(!closed);
+      closed = true;
     };
 
     client.on_error = [](const SimpleWeb::error_code &ec) {
@@ -149,8 +163,8 @@ int main() {
       client.start();
     });
 
-    while(client_callback_count < 5)
-      this_thread::sleep_for(chrono::milliseconds(10));
+    while(!closed)
+      this_thread::sleep_for(chrono::milliseconds(5));
 
     client.stop();
     client_thread.join();
@@ -163,18 +177,23 @@ int main() {
 
     server_callback_count = 0;
     atomic<int> client_callback_count(0);
+    atomic<bool> closed(false);
 
-    client.on_message = [&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
+
+      assert(!closed);
 
       if(client_callback_count == 201)
         client.send_close(1000);
     };
 
-    client.on_open = [&client, &client_callback_count]() {
+    client.on_open = [&]() {
       ++client_callback_count;
+
+      assert(!closed);
 
       for(size_t i = 0; i < 200; ++i) {
         auto send_stream = make_shared<WsClient::SendStream>();
@@ -183,8 +202,10 @@ int main() {
       }
     };
 
-    client.on_close = [&client_callback_count](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
+      assert(!closed);
+      closed = true;
     };
 
     client.on_error = [](const SimpleWeb::error_code &ec) {
@@ -196,8 +217,8 @@ int main() {
       client.start();
     });
 
-    while(client_callback_count < 202)
-      this_thread::sleep_for(chrono::milliseconds(10));
+    while(!closed)
+      this_thread::sleep_for(chrono::milliseconds(5));
 
     client.stop();
     client_thread.join();
