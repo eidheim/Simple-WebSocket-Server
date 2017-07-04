@@ -23,7 +23,7 @@ public:
     ss << "TestHeader3:test3b\r\n";
     ss << "\r\n";
 
-    parse_handshake(connection);
+    connection->parse_handshake();
 
     assert(connection->method == "GET");
     assert(connection->path == "/test/");
@@ -81,17 +81,18 @@ public:
   }
 
   void parse_response_header_test() {
-    connection = std::unique_ptr<Connection>(new Connection(new WS(*io_service)));
+    auto connection = std::shared_ptr<Connection>(new Connection(new WS(*io_service)));
+    connection->message = std::shared_ptr<Message>(new Message());
 
-    stringstream ss;
-    ss << "HTTP/1.1 200 OK\r\n";
-    ss << "TestHeader: test\r\n";
-    ss << "TestHeader2:test2\r\n";
-    ss << "TestHeader3:test3a\r\n";
-    ss << "TestHeader3:test3b\r\n";
-    ss << "\r\n";
+    ostream stream(&connection->message->streambuf);
+    stream << "HTTP/1.1 200 OK\r\n";
+    stream << "TestHeader: test\r\n";
+    stream << "TestHeader2:test2\r\n";
+    stream << "TestHeader3:test3a\r\n";
+    stream << "TestHeader3:test3b\r\n";
+    stream << "\r\n";
 
-    parse_handshake(ss);
+    connection->parse_handshake();
 
     assert(connection->header.size() == 4);
     auto header_it = connection->header.find("TestHeader");

@@ -118,6 +118,57 @@ namespace SimpleWeb {
           timer->cancel();
       }
 
+      void parse_handshake() {
+        std::istream stream(&read_buffer);
+        std::string line;
+        getline(stream, line);
+        size_t method_end;
+        if((method_end = line.find(' ')) != std::string::npos) {
+          size_t path_end;
+          if((path_end = line.find(' ', method_end + 1)) != std::string::npos) {
+            method = line.substr(0, method_end);
+            path = line.substr(method_end + 1, path_end - method_end - 1);
+            if((path_end + 6) < line.size())
+              http_version = line.substr(path_end + 6, line.size() - (path_end + 6) - 1);
+            else
+              http_version = "1.1";
+
+            getline(stream, line);
+            size_t param_end;
+            while((param_end = line.find(':')) != std::string::npos) {
+              size_t value_start = param_end + 1;
+              if((value_start) < line.size()) {
+                if(line[value_start] == ' ')
+                  value_start++;
+                if(value_start < line.size())
+                  header.emplace(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1));
+              }
+
+              getline(stream, line);
+            }
+          }
+        }
+      }
+
+      bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) {
+        std::ostream handshake(write_buffer.get());
+
+        auto header_it = header.find("Sec-WebSocket-Key");
+        if(header_it == header.end())
+          return false;
+
+        static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        auto sha1 = Crypto::sha1(header_it->second + ws_magic_string);
+
+        handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
+        handshake << "Upgrade: websocket\r\n";
+        handshake << "Connection: Upgrade\r\n";
+        handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
+        handshake << "\r\n";
+
+        return true;
+      }
+
       asio::strand strand;
 
       class SendData {
@@ -416,8 +467,6 @@ namespace SimpleWeb {
     std::shared_ptr<asio::io_service> io_service;
 
   protected:
-    const std::string ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
     bool internal_io_service = false;
 
     std::unique_ptr<asio::ip::tcp::acceptor> acceptor;
@@ -435,43 +484,11 @@ namespace SimpleWeb {
       asio::async_read_until(*connection->socket, connection->read_buffer, "\r\n\r\n", [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
         connection->cancel_timeout();
         if(!ec) {
-          parse_handshake(connection);
+          connection->parse_handshake();
 
           write_handshake(connection);
         }
       });
-    }
-
-    void parse_handshake(const std::shared_ptr<Connection> &connection) const {
-      std::istream stream(&connection->read_buffer);
-      std::string line;
-      getline(stream, line);
-      size_t method_end;
-      if((method_end = line.find(' ')) != std::string::npos) {
-        size_t path_end;
-        if((path_end = line.find(' ', method_end + 1)) != std::string::npos) {
-          connection->method = line.substr(0, method_end);
-          connection->path = line.substr(method_end + 1, path_end - method_end - 1);
-          if((path_end + 6) < line.size())
-            connection->http_version = line.substr(path_end + 6, line.size() - (path_end + 6) - 1);
-          else
-            connection->http_version = "1.1";
-
-          getline(stream, line);
-          size_t param_end;
-          while((param_end = line.find(':')) != std::string::npos) {
-            size_t value_start = param_end + 1;
-            if((value_start) < line.size()) {
-              if(line[value_start] == ' ')
-                value_start++;
-              if(value_start < line.size())
-                connection->header.emplace(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1));
-            }
-
-            getline(stream, line);
-          }
-        }
-      }
     }
 
     void write_handshake(const std::shared_ptr<Connection> &connection) {
@@ -481,7 +498,7 @@ namespace SimpleWeb {
         if(regex::regex_match(connection->path, path_match, regex_endpoint.first)) {
           auto write_buffer = std::make_shared<asio::streambuf>();
 
-          if(generate_handshake(connection, write_buffer)) {
+          if(connection->generate_handshake(write_buffer)) {
             connection->path_match = std::move(path_match);
             connection->set_timeout(config.timeout_request);
             asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, &regex_endpoint](const error_code &ec, size_t /*bytes_transferred*/) {
@@ -497,24 +514,6 @@ namespace SimpleWeb {
           return;
         }
       }
-    }
-
-    bool generate_handshake(const std::shared_ptr<Connection> &connection, const std::shared_ptr<asio::streambuf> &write_buffer) const {
-      std::ostream handshake(write_buffer.get());
-
-      auto header_it = connection->header.find("Sec-WebSocket-Key");
-      if(header_it == connection->header.end())
-        return false;
-
-      auto sha1 = Crypto::sha1(header_it->second + ws_magic_string);
-
-      handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
-      handshake << "Upgrade: websocket\r\n";
-      handshake << "Connection: Upgrade\r\n";
-      handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
-      handshake << "\r\n";
-
-      return true;
     }
 
     void read_message(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const {

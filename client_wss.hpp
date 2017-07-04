@@ -47,16 +47,17 @@ namespace SimpleWeb {
 
       resolver->async_resolve(query, [this](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
         if(!ec) {
-          connection = std::shared_ptr<Connection>(new Connection(new WSS(*io_service, context)));
+          auto connection = std::shared_ptr<Connection>(new Connection(new WSS(*io_service, context)));
+          current_connection = connection;
 
-          asio::async_connect(connection->socket->lowest_layer(), it, [this](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+          asio::async_connect(connection->socket->lowest_layer(), it, [this, connection](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
               connection->socket->lowest_layer().set_option(option);
 
-              connection->socket->async_handshake(asio::ssl::stream_base::client, [this](const error_code &ec) {
+              connection->socket->async_handshake(asio::ssl::stream_base::client, [this, connection](const error_code &ec) {
                 if(!ec)
-                  handshake();
+                  handshake(connection);
                 else if(on_error)
                   on_error(ec);
               });
