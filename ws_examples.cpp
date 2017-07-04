@@ -26,9 +26,9 @@ int main() {
     //auto message_str = data_ss.str();
     auto message_str = message->string();
 
-    cout << "Server: Message received: \"" << message_str << "\" from " << (size_t)connection.get() << endl;
+    cout << "Server: Message received: \"" << message_str << "\" from " << connection.get() << endl;
 
-    cout << "Server: Sending message \"" << message_str << "\" to " << (size_t)connection.get() << endl;
+    cout << "Server: Sending message \"" << message_str << "\" to " << connection.get() << endl;
 
     auto send_stream = make_shared<WsServer::SendStream>();
     *send_stream << message_str;
@@ -43,17 +43,17 @@ int main() {
   };
 
   echo.on_open = [](shared_ptr<WsServer::Connection> connection) {
-    cout << "Server: Opened connection " << (size_t)connection.get() << endl;
+    cout << "Server: Opened connection " << connection.get() << endl;
   };
 
   //See RFC 6455 7.4.1. for status codes
   echo.on_close = [](shared_ptr<WsServer::Connection> connection, int status, const string & /*reason*/) {
-    cout << "Server: Closed connection " << (size_t)connection.get() << " with status code " << status << endl;
+    cout << "Server: Closed connection " << connection.get() << " with status code " << status << endl;
   };
 
   //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
   echo.on_error = [](shared_ptr<WsServer::Connection> connection, const SimpleWeb::error_code &ec) {
-    cout << "Server: Error in connection " << (size_t)connection.get() << ". "
+    cout << "Server: Error in connection " << connection.get() << ". "
          << "Error: " << ec << ", error message: " << ec.message() << endl;
   };
 
@@ -115,15 +115,15 @@ int main() {
 
   //Example 4: Client communication with server
   //Possible output:
-  //Server: Opened connection 140184920260656
-  //Client: Opened connection
-  //Client: Sending message: "Hello"
-  //Server: Message received: "Hello" from 140184920260656
-  //Server: Sending message "Hello" to 140184920260656
-  //Client: Message received: "Hello"
-  //Client: Sending close connection
-  //Server: Closed connection 140184920260656 with status code 1000
-  //Client: Closed connection with status code 1000
+  // Server: Opened connection 0x7fcf21600380
+  // Client: Opened connection
+  // Client: Sending message: "Hello"
+  // Server: Message received: "Hello" from 0x7fcf21600380
+  // Server: Sending message "Hello" to 0x7fcf21600380
+  // Client: Message received: "Hello"
+  // Client: Sending close connection
+  // Server: Closed connection 0x7fcf21600380 with status code 1000
+  // Client: Closed connection with status code 1000
   WsClient client("localhost:8080/echo");
   client.on_message = [&client](shared_ptr<WsClient::Message> message) {
     auto message_str = message->string();
