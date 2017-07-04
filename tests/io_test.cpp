@@ -70,7 +70,7 @@ int main() {
 
   this_thread::sleep_for(chrono::seconds(1));
 
-  {
+  for(size_t i = 0; i < 400; ++i) {
     WsClient client("localhost:8080/echo");
 
     atomic<int> client_callback_count(0);
@@ -104,15 +104,17 @@ int main() {
       client.start();
     });
 
-    this_thread::sleep_for(chrono::seconds(1));
+    while(client_callback_count < 3)
+      this_thread::sleep_for(chrono::milliseconds(10));
 
     client.stop();
     client_thread.join();
 
     assert(client_callback_count == 3);
   }
+  assert(server_callback_count == 1200);
 
-  {
+  for(size_t i = 0; i < 400; ++i) {
     WsClient client("localhost:8080/echo_thrice");
 
     atomic<int> client_callback_count(0);
@@ -122,7 +124,8 @@ int main() {
 
       ++client_callback_count;
 
-      client.send_close(1000);
+      if(client_callback_count == 4)
+        client.send_close(1000);
     };
 
     client.on_open = [&client, &client_callback_count]() {
@@ -146,7 +149,8 @@ int main() {
       client.start();
     });
 
-    this_thread::sleep_for(chrono::seconds(1));
+    while(client_callback_count < 5)
+      this_thread::sleep_for(chrono::milliseconds(10));
 
     client.stop();
     client_thread.join();
@@ -154,10 +158,56 @@ int main() {
     assert(client_callback_count == 5);
   }
 
+  {
+    WsClient client("localhost:8080/echo");
+
+    server_callback_count = 0;
+    atomic<int> client_callback_count(0);
+
+    client.on_message = [&client, &client_callback_count](shared_ptr<WsClient::Message> message) {
+      assert(message->string() == "Hello");
+
+      ++client_callback_count;
+
+      if(client_callback_count == 201)
+        client.send_close(1000);
+    };
+
+    client.on_open = [&client, &client_callback_count]() {
+      ++client_callback_count;
+
+      for(size_t i = 0; i < 200; ++i) {
+        auto send_stream = make_shared<WsClient::SendStream>();
+        *send_stream << "Hello";
+        client.send(send_stream);
+      }
+    };
+
+    client.on_close = [&client_callback_count](int /*status*/, const string & /*reason*/) {
+      ++client_callback_count;
+    };
+
+    client.on_error = [](const SimpleWeb::error_code &ec) {
+      cerr << ec.message() << endl;
+      assert(false);
+    };
+
+    thread client_thread([&client]() {
+      client.start();
+    });
+
+    while(client_callback_count < 202)
+      this_thread::sleep_for(chrono::milliseconds(10));
+
+    client.stop();
+    client_thread.join();
+
+    assert(client_callback_count == 202);
+    assert(server_callback_count == 202);
+  }
+
   server.stop();
   server_thread.join();
-
-  assert(server_callback_count == 3);
 
   return 0;
 }
