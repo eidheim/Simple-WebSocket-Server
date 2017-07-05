@@ -15,8 +15,9 @@
 #ifdef USE_STANDALONE_ASIO
 #include <asio.hpp>
 namespace SimpleWeb {
+  namespace asio = asio;
   using error_code = std::error_code;
-}
+} // namespace SimpleWeb
 #else
 #include <boost/asio.hpp>
 namespace SimpleWeb {
