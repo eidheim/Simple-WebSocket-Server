@@ -70,6 +70,16 @@ int main() {
 
   this_thread::sleep_for(chrono::seconds(1));
 
+  // test stop
+  server.stop();
+  server_thread.join();
+
+  server_thread = thread([&server]() {
+    server.start();
+  });
+
+  this_thread::sleep_for(chrono::seconds(1));
+
   for(size_t i = 0; i < 400; ++i) {
     WsClient client("localhost:8080/echo");
 

@@ -12,6 +12,7 @@
 #include <iostream>
 #include <list>
 #include <random>
+#include <thread>
 
 #ifdef USE_STANDALONE_ASIO
 #include <asio.hpp>
@@ -186,9 +187,6 @@ namespace SimpleWeb {
         internal_io_service = true;
       }
 
-      if(io_service->stopped())
-        io_service->reset();
-
       if(!resolver)
         resolver = std::unique_ptr<asio::ip::tcp::resolver>(new asio::ip::tcp::resolver(*io_service));
 
@@ -200,13 +198,18 @@ namespace SimpleWeb {
 
     void stop() {
       resolver->cancel();
-      if(internal_io_service)
+      if(internal_io_service) {
         io_service->stop();
-
-      if(current_connection) {
-        error_code ec;
-        current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        current_connection->socket->lowest_layer().close();
+        while(!io_service->stopped())
+          std::this_thread::yield();
+        io_service->reset();
+      }
+      else {
+        if(current_connection) {
+          error_code ec;
+          current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+          current_connection->socket->lowest_layer().close();
+        }
       }
     }
 

@@ -325,9 +325,6 @@ namespace SimpleWeb {
         internal_io_service = true;
       }
 
-      if(io_service->stopped())
-        io_service->reset();
-
       asio::ip::tcp::endpoint endpoint;
       if(config.address.size() > 0)
         endpoint = asio::ip::tcp::endpoint(asio::ip::address::from_string(config.address), config.port);
@@ -363,16 +360,21 @@ namespace SimpleWeb {
 
     void stop() {
       acceptor->close();
-      if(internal_io_service)
+      if(internal_io_service) {
         io_service->stop();
-
-      for(auto &pair : endpoint) {
-        std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
-        for(auto &connection : pair.second.connections) {
-          connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both);
-          connection->socket->lowest_layer().close();
+        while(!io_service->stopped())
+          std::this_thread::yield();
+        io_service->reset();
+      }
+      else {
+        for(auto &pair : endpoint) {
+          std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
+          for(auto &connection : pair.second.connections) {
+            connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both);
+            connection->socket->lowest_layer().close();
+          }
+          pair.second.connections.clear();
         }
-        pair.second.connections.clear();
       }
     }
 
