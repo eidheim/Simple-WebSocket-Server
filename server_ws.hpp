@@ -369,9 +369,11 @@ namespace SimpleWeb {
 
         for(auto &pair : endpoint) {
           std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
-          for(auto &connection : pair.second.connections) {
-            connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both);
-            connection->socket->lowest_layer().close();
+          if(!internal_io_service) {
+            for(auto &connection : pair.second.connections) {
+              connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both);
+              connection->socket->lowest_layer().close();
+            }
           }
           pair.second.connections.clear();
         }

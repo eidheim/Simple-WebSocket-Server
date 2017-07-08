@@ -204,9 +204,11 @@ namespace SimpleWeb {
         io_service->stop();
 
       if(current_connection) {
-        error_code ec;
-        current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        current_connection->socket->lowest_layer().close();
+        if(!internal_io_service) {
+          error_code ec;
+          current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+          current_connection->socket->lowest_layer().close();
+        }
       }
     }
 
