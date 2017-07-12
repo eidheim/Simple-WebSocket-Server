@@ -364,19 +364,19 @@ namespace SimpleWeb {
     void stop() {
       if(acceptor) {
         acceptor->close();
-        if(internal_io_service)
-          io_service->stop();
 
         for(auto &pair : endpoint) {
           std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
-          if(!internal_io_service) {
-            for(auto &connection : pair.second.connections) {
-              connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both);
-              connection->socket->lowest_layer().close();
-            }
+          for(auto &connection : pair.second.connections) {
+            error_code ec;
+            connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            connection->socket->lowest_layer().close(ec);
           }
           pair.second.connections.clear();
         }
+
+        if(internal_io_service)
+          io_service->stop();
       }
     }
 

@@ -200,16 +200,15 @@ namespace SimpleWeb {
 
     void stop() {
       resolver->cancel();
-      if(internal_io_service)
-        io_service->stop();
 
       if(current_connection) {
-        if(!internal_io_service) {
-          error_code ec;
-          current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-          current_connection->socket->lowest_layer().close();
-        }
+        error_code ec;
+        current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        current_connection->socket->lowest_layer().close(ec);
       }
+
+      if(internal_io_service)
+        io_service->stop();
     }
 
     ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
