@@ -39,15 +39,6 @@ namespace SimpleWeb {
 #endif
 
 namespace SimpleWeb {
-// TODO: remove when onopen, onmessage, etc is removed:
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-
   template <class socket_type>
   class SocketServer;
 
@@ -250,13 +241,9 @@ namespace SimpleWeb {
       std::mutex connections_mutex;
 
     public:
-      DEPRECATED std::function<void(std::shared_ptr<Connection>)> onopen;
       std::function<void(std::shared_ptr<Connection>)> on_open;
-      DEPRECATED std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> onmessage;
       std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
-      DEPRECATED std::function<void(std::shared_ptr<Connection>, int, const std::string &)> onclose;
       std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
-      DEPRECATED std::function<void(std::shared_ptr<Connection>, const error_code &)> onerror;
       std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
 
       std::unordered_set<std::shared_ptr<Connection>> get_connections() {
@@ -308,18 +295,6 @@ namespace SimpleWeb {
     std::map<regex_orderable, Endpoint> endpoint;
 
     virtual void start() {
-      for(auto &endp : endpoint) {
-        // TODO: remove when onopen, onmessage, etc is removed:
-        if(endp.second.onopen)
-          endp.second.on_open = endp.second.onopen;
-        if(endp.second.onmessage)
-          endp.second.on_message = endp.second.onmessage;
-        if(endp.second.onclose)
-          endp.second.on_close = endp.second.onclose;
-        if(endp.second.onerror)
-          endp.second.on_error = endp.second.onerror;
-      }
-
       if(!io_service) {
         io_service = std::make_shared<asio::io_service>();
         internal_io_service = true;
@@ -713,14 +688,6 @@ namespace SimpleWeb {
   template <>
   class SocketServer<WS> : public SocketServerBase<WS> {
   public:
-    DEPRECATED SocketServer(unsigned short port, size_t thread_pool_size = 1, size_t timeout_request = 5, size_t timeout_idle = 0)
-        : SocketServer() {
-      config.port = port;
-      config.thread_pool_size = thread_pool_size;
-      config.timeout_request = timeout_request;
-      config.timeout_idle = timeout_idle;
-    };
-
     SocketServer() : SocketServerBase<WS>(80) {}
 
   protected:
@@ -743,12 +710,6 @@ namespace SimpleWeb {
       });
     }
   };
-// TODO: remove when onopen, onmessage, etc is removed:
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-}
+} // namespace SimpleWeb
 
 #endif /* SERVER_WS_HPP */

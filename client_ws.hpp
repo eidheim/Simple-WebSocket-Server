@@ -31,15 +31,6 @@ namespace SimpleWeb {
 #endif
 
 namespace SimpleWeb {
-// TODO: remove when onopen, onmessage, etc is removed:
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-
   template <class socket_type>
   class SocketClient;
 
@@ -161,26 +152,12 @@ namespace SimpleWeb {
       asio::streambuf streambuf;
     };
 
-    DEPRECATED std::function<void(void)> onopen;
     std::function<void(void)> on_open;
-    DEPRECATED std::function<void(std::shared_ptr<Message>)> onmessage;
     std::function<void(std::shared_ptr<Message>)> on_message;
-    DEPRECATED std::function<void(int, const std::string &)> onclose;
     std::function<void(int, const std::string &)> on_close;
-    DEPRECATED std::function<void(const error_code &)> onerror;
     std::function<void(const error_code &)> on_error;
 
     void start() {
-      // TODO: remove when onopen, onmessage, etc is removed:
-      if(onopen)
-        on_open = onopen;
-      if(onmessage)
-        on_message = onmessage;
-      if(onclose)
-        on_close = onclose;
-      if(onerror)
-        on_error = onerror;
-
       if(!io_service) {
         io_service = std::make_shared<asio::io_service>();
         internal_io_service = true;
@@ -520,12 +497,6 @@ namespace SimpleWeb {
       });
     }
   };
-// TODO: remove when onopen, onmessage, etc is removed:
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-}
+} // namespace SimpleWeb
 
 #endif /* CLIENT_WS_HPP */

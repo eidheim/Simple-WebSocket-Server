@@ -9,7 +9,6 @@
 #include <boost/asio/ssl.hpp>
 #endif
 
-
 namespace SimpleWeb {
   typedef asio::ssl::stream<asio::ip::tcp::socket> WSS;
 
