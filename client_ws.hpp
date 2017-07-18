@@ -141,11 +141,11 @@ namespace SimpleWeb {
       }
 
     public:
-      ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
-      ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
+      /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
+      /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
       void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
                 unsigned char fin_rsv_opcode = 129) {
-        //Create mask
+        // Create mask
         std::vector<unsigned char> mask;
         mask.resize(4);
         std::uniform_int_distribution<unsigned short> dist(0, 255);
@@ -159,7 +159,7 @@ namespace SimpleWeb {
         size_t length = message_stream->size();
 
         send_stream->put(fin_rsv_opcode);
-        //masked (first length byte>=128)
+        // Masked (first length byte>=128)
         if(length >= 126) {
           int num_bytes;
           if(length > 0xffff) {
@@ -195,7 +195,7 @@ namespace SimpleWeb {
       }
 
       void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
-        //Send close only once (in case close is initiated by client)
+        // Send close only once (in case close is initiated by client)
         if(closed)
           return;
         closed = true;
@@ -207,7 +207,7 @@ namespace SimpleWeb {
 
         *send_stream << reason;
 
-        //fin_rsv_opcode=136: message close
+        // fin_rsv_opcode=136: message close
         send(send_stream, callback, 136);
       }
     };
@@ -322,7 +322,7 @@ namespace SimpleWeb {
       request << "Upgrade: websocket\r\n";
       request << "Connection: Upgrade\r\n";
 
-      //Make random 16-byte nonce
+      // Make random 16-byte nonce
       std::string nonce;
       nonce.resize(16);
       std::uniform_int_distribution<unsigned short> dist(0, 255);
@@ -365,7 +365,7 @@ namespace SimpleWeb {
     void read_message(const std::shared_ptr<Connection> &connection) {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t bytes_transferred) {
         if(!ec) {
-          if(bytes_transferred == 0) { //TODO: This might happen on server at least, might also happen here
+          if(bytes_transferred == 0) { // TODO: This might happen on server at least, might also happen here
             this->read_message(connection);
             return;
           }
@@ -375,7 +375,7 @@ namespace SimpleWeb {
 
           connection->message->fin_rsv_opcode = first_bytes[0];
 
-          //Close connection if masked message from server (protocol error)
+          // Close connection if masked message from server (protocol error)
           if(first_bytes[1] >= 128) {
             const std::string reason("message from server masked");
             connection->send_close(1002, reason, [this](const error_code & /*ec*/) {});
@@ -387,7 +387,7 @@ namespace SimpleWeb {
           size_t length = (first_bytes[1] & 127);
 
           if(length == 126) {
-            //2 next bytes is the size of content
+            // 2 next bytes is the size of content
             asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
@@ -407,7 +407,7 @@ namespace SimpleWeb {
             });
           }
           else if(length == 127) {
-            //8 next bytes is the size of content
+            // 8 next bytes is the size of content
             asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(8), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
@@ -439,7 +439,7 @@ namespace SimpleWeb {
     void read_message_content(const std::shared_ptr<Connection> &connection) {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
         if(!ec) {
-          //If connection close
+          // If connection close
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
             int status = 0;
             if(connection->message->length >= 2) {
@@ -455,9 +455,9 @@ namespace SimpleWeb {
               this->on_close(status, reason);
             return;
           }
-          //If ping
+          // If ping
           else if((connection->message->fin_rsv_opcode & 0x0f) == 9) {
-            //send pong
+            // Send pong
             auto empty_send_stream = std::make_shared<SendStream>();
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
           }
@@ -465,7 +465,7 @@ namespace SimpleWeb {
             this->on_message(connection->message);
           }
 
-          //Next message
+          // Next message
           connection->message = std::shared_ptr<Message>(new Message());
           this->read_message(connection);
         }
