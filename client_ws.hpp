@@ -69,8 +69,17 @@ namespace SimpleWeb {
       template <typename... Args>
       Connection(Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
 
-      std::unique_ptr<socket_type> socket;
+      std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
+      std::mutex socket_close_mutex;
+
       std::shared_ptr<Message> message;
+
+      void close() {
+        error_code ec;
+        std::unique_lock<std::mutex> lock(socket_close_mutex); // The following operations seems to be needed to run sequentially
+        socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket->lowest_layer().close(ec);
+      }
 
       void parse_handshake() {
         std::string line;
@@ -254,10 +263,10 @@ namespace SimpleWeb {
     }
 
     void stop() {
-      if(connection) {
-        error_code ec;
-        connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        connection->socket->lowest_layer().close(ec);
+      {
+        std::unique_lock<std::mutex> lock(connection_mutex);
+        if(connection)
+          connection->close();
       }
 
       if(internal_io_service)

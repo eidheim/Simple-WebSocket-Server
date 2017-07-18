@@ -80,7 +80,7 @@ namespace SimpleWeb {
       template <typename... Args>
       Connection(long timeout_idle, Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), timeout_idle(timeout_idle), strand(socket->get_io_service()), closed(false) {}
 
-      std::unique_ptr<socket_type> socket;
+      std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
       std::mutex socket_close_mutex;
 
       asio::streambuf read_buffer;
@@ -441,15 +441,13 @@ namespace SimpleWeb {
 
     void stop() {
       if(acceptor) {
-        acceptor->close();
+        error_code ec;
+        acceptor->close(ec);
 
         for(auto &pair : endpoint) {
           std::lock_guard<std::mutex> lock(pair.second.connections_mutex);
-          for(auto &connection : pair.second.connections) {
-            error_code ec;
-            connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            connection->socket->lowest_layer().close(ec);
-          }
+          for(auto &connection : pair.second.connections)
+            connection->close();
           pair.second.connections.clear();
         }
 
