@@ -46,7 +46,7 @@ namespace SimpleWeb {
 
       resolver->async_resolve(query, [this](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
         if(!ec) {
-          auto connection = std::shared_ptr<Connection>(new Connection(new WSS(*io_service, context)));
+          auto connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
           current_connection = connection;
 
           asio::async_connect(connection->socket->lowest_layer(), it, [this, connection](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {

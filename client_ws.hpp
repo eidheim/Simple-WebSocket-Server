@@ -64,7 +64,8 @@ namespace SimpleWeb {
       unsigned short remote_endpoint_port;
 
     private:
-      Connection(socket_type *socket) : socket(socket), strand(socket->get_io_service()), closed(false) {}
+      template <typename... Args>
+      Connection(Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
 
       std::unique_ptr<socket_type> socket;
       std::shared_ptr<Message> message;
@@ -478,7 +479,7 @@ namespace SimpleWeb {
 
       resolver->async_resolve(query, [this](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
         if(!ec) {
-          auto connection = std::shared_ptr<Connection>(new Connection(new WS(*io_service)));
+          auto connection = std::shared_ptr<Connection>(new Connection(*io_service));
           this->current_connection = connection;
 
           asio::async_connect(*connection->socket, it, [this, connection](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {

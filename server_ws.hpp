@@ -60,12 +60,13 @@ namespace SimpleWeb {
       }
     };
 
-    class Connection {
+    class Connection : public std::enable_shared_from_this<Connection> {
       friend class SocketServerBase<socket_type>;
       friend class SocketServer<socket_type>;
 
     public:
-      Connection(const std::shared_ptr<socket_type> &socket) : socket(socket), strand(socket->get_io_service()), closed(false) {}
+      template <typename... Args>
+      Connection(Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
 
       std::string method, path, http_version;
 
@@ -79,7 +80,7 @@ namespace SimpleWeb {
     private:
       Connection(socket_type *socket) : socket(socket), strand(socket->get_io_service()), closed(false) {}
 
-      std::shared_ptr<socket_type> socket;
+      std::unique_ptr<socket_type> socket;
       asio::streambuf read_buffer;
 
       std::unique_ptr<asio::deadline_timer> timer;
@@ -94,12 +95,12 @@ namespace SimpleWeb {
 
         timer = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(socket->get_io_service()));
         timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
-        auto socket = this->socket;
-        timer->async_wait([socket](const error_code &ec) {
+        auto self = this->shared_from_this();
+        timer->async_wait([self](const error_code &ec) {
           if(!ec) {
             error_code ec;
-            socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            socket->lowest_layer().close();
+            self->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            self->socket->lowest_layer().close();
           }
         });
       }
@@ -694,7 +695,7 @@ namespace SimpleWeb {
     void accept() {
       //Create new socket for this connection (stored in Connection::socket)
       //Shared_ptr is used to pass temporary objects to the asynchronous functions
-      std::shared_ptr<Connection> connection(new Connection(new WS(*io_service)));
+      std::shared_ptr<Connection> connection(new Connection(*io_service));
 
       acceptor->async_accept(*connection->socket, [this, connection](const error_code &ec) {
         //Immediately start accepting a new connection (if io_service hasn't been stopped)

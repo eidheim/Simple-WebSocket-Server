@@ -81,7 +81,7 @@ public:
   }
 
   void parse_response_header_test() {
-    auto connection = std::shared_ptr<Connection>(new Connection(new WS(*io_service)));
+    auto connection = std::shared_ptr<Connection>(new Connection(*io_service));
     connection->message = std::shared_ptr<Message>(new Message());
 
     ostream stream(&connection->message->streambuf);
