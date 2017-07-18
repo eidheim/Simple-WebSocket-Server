@@ -65,10 +65,9 @@ namespace SimpleWeb {
       friend class SocketServer<socket_type>;
 
     public:
-      template <typename... Args>
-      Connection(Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
+      Connection(std::unique_ptr<socket_type> &&socket) : socket(std::move(socket)), timeout_idle(0), strand(this->socket->get_io_service()), closed(false) {}
 
-      std::string method, path, http_version;
+      std::string method, path, query_string, http_version;
 
       CaseInsensitiveMultimap header;
 
@@ -78,16 +77,34 @@ namespace SimpleWeb {
       unsigned short remote_endpoint_port;
 
     private:
-      Connection(socket_type *socket) : socket(socket), strand(socket->get_io_service()), closed(false) {}
+      template <typename... Args>
+      Connection(long timeout_idle, Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), timeout_idle(timeout_idle), strand(socket->get_io_service()), closed(false) {}
 
       std::unique_ptr<socket_type> socket;
+      std::mutex socket_close_mutex;
+
       asio::streambuf read_buffer;
 
+      long timeout_idle;
       std::unique_ptr<asio::deadline_timer> timer;
-      std::unique_ptr<asio::deadline_timer> timer_idle;
-      std::mutex timer_idle_mutex;
+      std::mutex timer_mutex;
 
-      void set_timeout(size_t seconds) {
+      void close() {
+        error_code ec;
+        std::unique_lock<std::mutex> lock(socket_close_mutex); // The following operations seems to be needed to run sequentially
+        socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket->lowest_layer().close(ec);
+      }
+
+      void set_timeout(long seconds = -1) {
+        bool use_timeout_idle = false;
+        if(seconds == -1) {
+          use_timeout_idle = true;
+          seconds = timeout_idle;
+        }
+
+        std::unique_lock<std::mutex> lock(timer_mutex);
+
         if(seconds == 0) {
           timer = nullptr;
           return;
@@ -96,40 +113,62 @@ namespace SimpleWeb {
         timer = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(socket->get_io_service()));
         timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
         auto self = this->shared_from_this();
-        timer->async_wait([self](const error_code &ec) {
+        timer->async_wait([self, use_timeout_idle](const error_code &ec) {
           if(!ec) {
-            error_code ec;
-            self->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            self->socket->lowest_layer().close();
+            if(use_timeout_idle)
+              self->send_close(1000, "idle timeout"); //1000=normal closure
+            else
+              self->close();
           }
         });
       }
 
       void cancel_timeout() {
+        std::unique_lock<std::mutex> lock(timer_mutex);
         if(timer)
           timer->cancel();
       }
 
-      void parse_handshake() {
+      bool parse_handshake() {
         std::istream stream(&read_buffer);
         std::string line;
         getline(stream, line);
         size_t method_end;
         if((method_end = line.find(' ')) != std::string::npos) {
-          size_t path_end;
-          if((path_end = line.find(' ', method_end + 1)) != std::string::npos) {
-            method = line.substr(0, method_end);
-            path = line.substr(method_end + 1, path_end - method_end - 1);
-            if((path_end + 6) < line.size())
-              http_version = line.substr(path_end + 6, line.size() - (path_end + 6) - 1);
+          method = line.substr(0, method_end);
+
+          size_t query_start = std::string::npos;
+          size_t path_and_query_string_end = std::string::npos;
+          for(size_t i = method_end + 1; i < line.size(); ++i) {
+            if(line[i] == '?' && (i + 1) < line.size())
+              query_start = i + 1;
+            else if(line[i] == ' ') {
+              path_and_query_string_end = i;
+              break;
+            }
+          }
+          if(path_and_query_string_end != std::string::npos) {
+            if(query_start != std::string::npos) {
+              path = line.substr(method_end + 1, query_start - method_end - 2);
+              query_string = line.substr(query_start, path_and_query_string_end - query_start);
+            }
             else
-              http_version = "1.1";
+              path = line.substr(method_end + 1, path_and_query_string_end - method_end - 1);
+
+            size_t protocol_end;
+            if((protocol_end = line.find('/', path_and_query_string_end + 1)) != std::string::npos) {
+              if(line.compare(path_and_query_string_end + 1, protocol_end - path_and_query_string_end - 1, "HTTP") != 0)
+                return false;
+              http_version = line.substr(protocol_end + 1, line.size() - protocol_end - 2);
+            }
+            else
+              return false;
 
             getline(stream, line);
             size_t param_end;
             while((param_end = line.find(':')) != std::string::npos) {
               size_t value_start = param_end + 1;
-              if((value_start) < line.size()) {
+              if(value_start < line.size()) {
                 if(line[value_start] == ' ')
                   value_start++;
                 if(value_start < line.size())
@@ -139,7 +178,12 @@ namespace SimpleWeb {
               getline(stream, line);
             }
           }
+          else
+            return false;
         }
+        else
+          return false;
+        return true;
       }
 
       bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) {
@@ -165,9 +209,9 @@ namespace SimpleWeb {
 
       class SendData {
       public:
-        SendData(const std::shared_ptr<SendStream> &header_stream, const std::shared_ptr<SendStream> &message_stream,
-                 const std::function<void(const error_code)> &callback)
-            : header_stream(header_stream), message_stream(message_stream), callback(callback) {}
+        SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
+                 std::function<void(const error_code)> &&callback)
+            : header_stream(std::move(header_stream)), message_stream(std::move(message_stream)), callback(std::move(callback)) {}
         std::shared_ptr<SendStream> header_stream;
         std::shared_ptr<SendStream> message_stream;
         std::function<void(const error_code)> callback;
@@ -175,28 +219,29 @@ namespace SimpleWeb {
 
       std::list<SendData> send_queue;
 
-      void send_from_queue(const std::shared_ptr<Connection> &connection) {
-        strand.post([this, connection]() {
-          asio::async_write(*socket, send_queue.begin()->header_stream->streambuf, strand.wrap([this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+      void send_from_queue() {
+        auto self = this->shared_from_this();
+        strand.post([self]() {
+          asio::async_write(*self->socket, self->send_queue.begin()->header_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
             if(!ec) {
-              asio::async_write(*socket, send_queue.begin()->message_stream->streambuf, strand.wrap([this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
-                auto send_queued = send_queue.begin();
+              asio::async_write(*self->socket, self->send_queue.begin()->message_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+                auto send_queued = self->send_queue.begin();
                 if(send_queued->callback)
                   send_queued->callback(ec);
                 if(!ec) {
-                  send_queue.erase(send_queued);
-                  if(send_queue.size() > 0)
-                    send_from_queue(connection);
+                  self->send_queue.erase(send_queued);
+                  if(self->send_queue.size() > 0)
+                    self->send_from_queue();
                 }
                 else
-                  send_queue.clear();
+                  self->send_queue.clear();
               }));
             }
             else {
-              auto send_queued = send_queue.begin();
+              auto send_queued = self->send_queue.begin();
               if(send_queued->callback)
                 send_queued->callback(ec);
-              send_queue.clear();
+              self->send_queue.clear();
             }
           }));
         });
@@ -211,6 +256,63 @@ namespace SimpleWeb {
         }
         catch(...) {
         }
+      }
+
+    public:
+      ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
+      ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
+      void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
+                unsigned char fin_rsv_opcode = 129) {
+        cancel_timeout();
+        set_timeout();
+
+        auto header_stream = std::make_shared<SendStream>();
+
+        size_t length = message_stream->size();
+
+        header_stream->put(fin_rsv_opcode);
+        //unmasked (first length byte<128)
+        if(length >= 126) {
+          int num_bytes;
+          if(length > 0xffff) {
+            num_bytes = 8;
+            header_stream->put(127);
+          }
+          else {
+            num_bytes = 2;
+            header_stream->put(126);
+          }
+
+          for(int c = num_bytes - 1; c >= 0; c--) {
+            header_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
+          }
+        }
+        else
+          header_stream->put(static_cast<unsigned char>(length));
+
+        auto self = this->shared_from_this();
+        strand.post([self, header_stream, message_stream, callback]() {
+          self->send_queue.emplace_back(header_stream, message_stream, callback);
+          if(self->send_queue.size() == 1)
+            self->send_from_queue();
+        });
+      }
+
+      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
+        //Send close only once (in case close is initiated by server)
+        if(closed)
+          return;
+        closed = true;
+
+        auto send_stream = std::make_shared<SendStream>();
+
+        send_stream->put(status >> 8);
+        send_stream->put(status % 256);
+
+        *send_stream << reason;
+
+        //fin_rsv_opcode=136: message close
+        send(send_stream, callback, 136);
       }
     };
 
@@ -267,9 +369,9 @@ namespace SimpleWeb {
       /// Defaults to 1 thread.
       size_t thread_pool_size = 1;
       /// Timeout on request handling. Defaults to 5 seconds.
-      size_t timeout_request = 5;
+      long timeout_request = 5;
       /// Idle timeout. Defaults to no timeout.
-      size_t timeout_idle = 0;
+      long timeout_idle = 0;
       /// IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
       /// If empty, the address will be any address.
       std::string address;
@@ -356,62 +458,6 @@ namespace SimpleWeb {
       }
     }
 
-    ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
-    ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-    void send(const std::shared_ptr<Connection> &connection, const std::shared_ptr<SendStream> &message_stream,
-              const std::function<void(const error_code &)> &callback = nullptr, unsigned char fin_rsv_opcode = 129) const {
-      cancel_idle_timeout(connection);
-      set_idle_timeout(connection);
-
-      auto header_stream = std::make_shared<SendStream>();
-
-      size_t length = message_stream->size();
-
-      header_stream->put(fin_rsv_opcode);
-      //unmasked (first length byte<128)
-      if(length >= 126) {
-        int num_bytes;
-        if(length > 0xffff) {
-          num_bytes = 8;
-          header_stream->put(127);
-        }
-        else {
-          num_bytes = 2;
-          header_stream->put(126);
-        }
-
-        for(int c = num_bytes - 1; c >= 0; c--) {
-          header_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-        }
-      }
-      else
-        header_stream->put(static_cast<unsigned char>(length));
-
-      connection->strand.post([this, connection, header_stream, message_stream, callback]() {
-        connection->send_queue.emplace_back(header_stream, message_stream, callback);
-        if(connection->send_queue.size() == 1)
-          connection->send_from_queue(connection);
-      });
-    }
-
-    void send_close(const std::shared_ptr<Connection> &connection, int status, const std::string &reason = "",
-                    const std::function<void(const error_code &)> &callback = nullptr) const {
-      //Send close only once (in case close is initiated by server)
-      if(connection->closed)
-        return;
-      connection->closed = true;
-
-      auto send_stream = std::make_shared<SendStream>();
-
-      send_stream->put(status >> 8);
-      send_stream->put(status % 256);
-
-      *send_stream << reason;
-
-      //fin_rsv_opcode=136: message close
-      send(connection, send_stream, callback, 136);
-    }
-
     std::unordered_set<std::shared_ptr<Connection>> get_connections() {
       std::unordered_set<std::shared_ptr<Connection>> all_connections;
       for(auto &e : endpoint) {
@@ -429,9 +475,10 @@ namespace SimpleWeb {
      *
      * Example use:
      * server.on_upgrade=[&socket_server] (auto socket, auto request) {
-     *   auto connection=std::make_shared<SimpleWeb::SocketServer<SimpleWeb::WS>::Connection>(socket);
+     *   auto connection=std::make_shared<SimpleWeb::SocketServer<SimpleWeb::WS>::Connection>(std::move(socket));
      *   connection->method=std::move(request->method);
      *   connection->path=std::move(request->path);
+     *   connection->query_string=std::move(request->query_string);
      *   connection->http_version=std::move(request->http_version);
      *   connection->header=std::move(request->header);
      *   connection->remote_endpoint_address=std::move(request->remote_endpoint_address);
@@ -440,6 +487,7 @@ namespace SimpleWeb {
      * }
      */
     void upgrade(const std::shared_ptr<Connection> &connection) {
+      connection->timeout_idle = config.timeout_idle;
       write_handshake(connection);
     }
 
@@ -450,7 +498,6 @@ namespace SimpleWeb {
     bool internal_io_service = false;
 
     std::unique_ptr<asio::ip::tcp::acceptor> acceptor;
-
     std::vector<std::thread> threads;
 
     SocketServerBase(unsigned short port) : config(port) {}
@@ -464,9 +511,8 @@ namespace SimpleWeb {
       asio::async_read_until(*connection->socket, connection->read_buffer, "\r\n\r\n", [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
         connection->cancel_timeout();
         if(!ec) {
-          connection->parse_handshake();
-
-          write_handshake(connection);
+          if(connection->parse_handshake())
+            write_handshake(connection);
         }
       });
     }
@@ -514,7 +560,7 @@ namespace SimpleWeb {
           //Close connection if unmasked message from client (protocol error)
           if(first_bytes[1] < 128) {
             const std::string reason("message from client not masked");
-            send_close(connection, 1002, reason, [this, connection](const error_code & /*ec*/) {});
+            connection->send_close(1002, reason, [](const error_code & /*ec*/) {});
             connection_close(connection, endpoint, 1002, reason);
             return;
           }
@@ -600,7 +646,7 @@ namespace SimpleWeb {
             }
 
             auto reason = message->string();
-            send_close(connection, status, reason, [this, connection](const error_code & /*ec*/) {});
+            connection->send_close(status, reason, [](const error_code & /*ec*/) {});
             connection_close(connection, endpoint, status, reason);
             return;
           }
@@ -609,11 +655,11 @@ namespace SimpleWeb {
             if((fin_rsv_opcode & 0x0f) == 9) {
               //send pong
               auto empty_send_stream = std::make_shared<SendStream>();
-              send(connection, empty_send_stream, nullptr, fin_rsv_opcode + 1);
+              connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
             }
             else if(endpoint.on_message) {
-              cancel_idle_timeout(connection);
-              set_idle_timeout(connection);
+              connection->cancel_timeout();
+              connection->set_timeout();
               endpoint.on_message(connection, message);
             }
 
@@ -627,7 +673,8 @@ namespace SimpleWeb {
     }
 
     void connection_open(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) {
-      set_idle_timeout(connection);
+      connection->cancel_timeout();
+      connection->set_timeout();
 
       {
         std::lock_guard<std::mutex> lock(endpoint.connections_mutex);
@@ -639,7 +686,8 @@ namespace SimpleWeb {
     }
 
     void connection_close(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, int status, const std::string &reason) const {
-      cancel_idle_timeout(connection);
+      connection->cancel_timeout();
+      connection->set_timeout();
 
       {
         std::lock_guard<std::mutex> lock(endpoint.connections_mutex);
@@ -651,7 +699,8 @@ namespace SimpleWeb {
     }
 
     void connection_error(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, const error_code &ec) const {
-      cancel_idle_timeout(connection);
+      connection->cancel_timeout();
+      connection->set_timeout();
 
       {
         std::lock_guard<std::mutex> lock(endpoint.connections_mutex);
@@ -660,24 +709,6 @@ namespace SimpleWeb {
 
       if(endpoint.on_error)
         endpoint.on_error(connection, ec);
-    }
-
-    void set_idle_timeout(const std::shared_ptr<Connection> &connection) const {
-      if(config.timeout_idle > 0) {
-        std::lock_guard<std::mutex> lock(connection->timer_idle_mutex);
-        connection->timer_idle = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(connection->socket->get_io_service()));
-        connection->timer_idle->expires_from_now(boost::posix_time::seconds(static_cast<unsigned long>(config.timeout_idle)));
-        connection->timer_idle->async_wait([this, connection](const error_code &ec) {
-          if(!ec)
-            send_close(connection, 1000, "idle timeout"); //1000=normal closure
-        });
-      }
-    }
-    void cancel_idle_timeout(const std::shared_ptr<Connection> &connection) const {
-      if(connection->timer_idle) {
-        std::lock_guard<std::mutex> lock(connection->timer_idle_mutex);
-        connection->timer_idle->cancel();
-      }
     }
   };
 
@@ -695,7 +726,7 @@ namespace SimpleWeb {
     void accept() {
       //Create new socket for this connection (stored in Connection::socket)
       //Shared_ptr is used to pass temporary objects to the asynchronous functions
-      std::shared_ptr<Connection> connection(new Connection(*io_service));
+      std::shared_ptr<Connection> connection(new Connection(config.timeout_idle, *io_service));
 
       acceptor->async_accept(*connection->socket, [this, connection](const error_code &ec) {
         //Immediately start accepting a new connection (if io_service hasn't been stopped)

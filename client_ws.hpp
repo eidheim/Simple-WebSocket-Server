@@ -11,6 +11,7 @@
 #include <atomic>
 #include <iostream>
 #include <list>
+#include <mutex>
 #include <random>
 
 #ifdef USE_STANDALONE_ASIO
@@ -54,11 +55,12 @@ namespace SimpleWeb {
 
     class Message;
 
-    class Connection {
+    class Connection : public std::enable_shared_from_this<Connection> {
       friend class SocketClientBase<socket_type>;
       friend class SocketClient<socket_type>;
 
     public:
+      std::string http_version, status_code;
       CaseInsensitiveMultimap header;
       std::string remote_endpoint_address;
       unsigned short remote_endpoint_port;
@@ -73,20 +75,26 @@ namespace SimpleWeb {
       void parse_handshake() {
         std::string line;
         getline(*message, line);
-        //Not parsing the first line
-
-        getline(*message, line);
-        size_t param_end;
-        while((param_end = line.find(':')) != std::string::npos) {
-          size_t value_start = param_end + 1;
-          if((value_start) < line.size()) {
-            if(line[value_start] == ' ')
-              value_start++;
-            if(value_start < line.size())
-              header.emplace(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1));
-          }
+        size_t version_end = line.find(' ');
+        if(version_end != std::string::npos) {
+          if(5 < line.size())
+            http_version = line.substr(5, version_end - 5);
+          if((version_end + 1) < line.size())
+            status_code = line.substr(version_end + 1, line.size() - (version_end + 1) - 1);
 
           getline(*message, line);
+          size_t param_end;
+          while((param_end = line.find(':')) != std::string::npos) {
+            size_t value_start = param_end + 1;
+            if((value_start) < line.size()) {
+              if(line[value_start] == ' ')
+                value_start++;
+              if(value_start < line.size())
+                header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1)));
+            }
+
+            getline(*message, line);
+          }
         }
       }
 
@@ -94,8 +102,8 @@ namespace SimpleWeb {
 
       class SendData {
       public:
-        SendData(const std::shared_ptr<SendStream> &send_stream, const std::function<void(const error_code)> &callback)
-            : send_stream(send_stream), callback(callback) {}
+        SendData(std::shared_ptr<SendStream> send_stream, std::function<void(const error_code)> &&callback)
+            : send_stream(std::move(send_stream)), callback(std::move(callback)) {}
         std::shared_ptr<SendStream> send_stream;
         std::function<void(const error_code)> callback;
       };
@@ -103,18 +111,19 @@ namespace SimpleWeb {
       std::list<SendData> send_queue;
 
       void send_from_queue() {
-        strand.post([this]() {
-          asio::async_write(*socket, send_queue.begin()->send_stream->streambuf, strand.wrap([this](const error_code &ec, size_t /*bytes_transferred*/) {
-            auto send_queued = send_queue.begin();
+        auto self = this->shared_from_this();
+        strand.post([self]() {
+          asio::async_write(*self->socket, self->send_queue.begin()->send_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+            auto send_queued = self->send_queue.begin();
             if(send_queued->callback)
               send_queued->callback(ec);
             if(!ec) {
-              send_queue.erase(send_queued);
-              if(send_queue.size() > 0)
-                send_from_queue();
+              self->send_queue.erase(send_queued);
+              if(self->send_queue.size() > 0)
+                self->send_from_queue();
             }
             else
-              send_queue.clear();
+              self->send_queue.clear();
           }));
         });
       }
@@ -129,6 +138,77 @@ namespace SimpleWeb {
         catch(const std::exception &e) {
           std::cerr << e.what() << std::endl;
         }
+      }
+
+    public:
+      ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
+      ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
+      void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
+                unsigned char fin_rsv_opcode = 129) {
+        //Create mask
+        std::vector<unsigned char> mask;
+        mask.resize(4);
+        std::uniform_int_distribution<unsigned short> dist(0, 255);
+        std::random_device rd;
+        for(int c = 0; c < 4; c++) {
+          mask[c] = static_cast<unsigned char>(dist(rd));
+        }
+
+        auto send_stream = std::make_shared<SendStream>();
+
+        size_t length = message_stream->size();
+
+        send_stream->put(fin_rsv_opcode);
+        //masked (first length byte>=128)
+        if(length >= 126) {
+          int num_bytes;
+          if(length > 0xffff) {
+            num_bytes = 8;
+            send_stream->put(static_cast<unsigned char>(127 + 128));
+          }
+          else {
+            num_bytes = 2;
+            send_stream->put(static_cast<unsigned char>(126 + 128));
+          }
+
+          for(int c = num_bytes - 1; c >= 0; c--) {
+            send_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
+          }
+        }
+        else
+          send_stream->put(static_cast<unsigned char>(length + 128));
+
+        for(int c = 0; c < 4; c++) {
+          send_stream->put(mask[c]);
+        }
+
+        for(size_t c = 0; c < length; c++) {
+          send_stream->put(message_stream->get() ^ mask[c % 4]);
+        }
+
+        auto self = this->shared_from_this();
+        strand.post([self, send_stream, callback]() {
+          self->send_queue.emplace_back(send_stream, callback);
+          if(self->send_queue.size() == 1)
+            self->send_from_queue();
+        });
+      }
+
+      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
+        //Send close only once (in case close is initiated by client)
+        if(closed)
+          return;
+        closed = true;
+
+        auto send_stream = std::make_shared<SendStream>();
+
+        send_stream->put(status >> 8);
+        send_stream->put(status % 256);
+
+        *send_stream << reason;
+
+        //fin_rsv_opcode=136: message close
+        send(send_stream, callback, 136);
       }
     };
 
@@ -167,9 +247,6 @@ namespace SimpleWeb {
       if(io_service->stopped())
         io_service->reset();
 
-      if(!resolver)
-        resolver = std::unique_ptr<asio::ip::tcp::resolver>(new asio::ip::tcp::resolver(*io_service));
-
       connect();
 
       if(internal_io_service)
@@ -177,99 +254,35 @@ namespace SimpleWeb {
     }
 
     void stop() {
-      resolver->cancel();
-
-      if(current_connection) {
+      if(connection) {
         error_code ec;
-        current_connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        current_connection->socket->lowest_layer().close(ec);
+        connection->socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        connection->socket->lowest_layer().close(ec);
       }
 
       if(internal_io_service)
         io_service->stop();
     }
 
-    ///fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
-    ///See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-    void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
-              unsigned char fin_rsv_opcode = 129) {
-      //Create mask
-      std::vector<unsigned char> mask;
-      mask.resize(4);
-      std::uniform_int_distribution<unsigned short> dist(0, 255);
-      std::random_device rd;
-      for(int c = 0; c < 4; c++) {
-        mask[c] = static_cast<unsigned char>(dist(rd));
-      }
-
-      auto send_stream = std::make_shared<SendStream>();
-
-      size_t length = message_stream->size();
-
-      send_stream->put(fin_rsv_opcode);
-      //masked (first length byte>=128)
-      if(length >= 126) {
-        int num_bytes;
-        if(length > 0xffff) {
-          num_bytes = 8;
-          send_stream->put(static_cast<unsigned char>(127 + 128));
-        }
-        else {
-          num_bytes = 2;
-          send_stream->put(static_cast<unsigned char>(126 + 128));
-        }
-
-        for(int c = num_bytes - 1; c >= 0; c--) {
-          send_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-        }
-      }
-      else
-        send_stream->put(static_cast<unsigned char>(length + 128));
-
-      for(int c = 0; c < 4; c++) {
-        send_stream->put(mask[c]);
-      }
-
-      for(size_t c = 0; c < length; c++) {
-        send_stream->put(message_stream->get() ^ mask[c % 4]);
-      }
-
-      current_connection->strand.post([this, send_stream, callback]() {
-        current_connection->send_queue.emplace_back(send_stream, callback);
-        if(current_connection->send_queue.size() == 1)
-          current_connection->send_from_queue();
-      });
-    }
-
-    void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
-      //Send close only once (in case close is initiated by client)
-      if(current_connection->closed)
-        return;
-      current_connection->closed = true;
-
-      auto send_stream = std::make_shared<SendStream>();
-
-      send_stream->put(status >> 8);
-      send_stream->put(status % 256);
-
-      *send_stream << reason;
-
-      //fin_rsv_opcode=136: message close
-      send(send_stream, callback, 136);
-    }
-
     /// If you have your own asio::io_service, store its pointer here before running start().
     std::shared_ptr<asio::io_service> io_service;
 
+    std::shared_ptr<Connection> get_connection() {
+      std::unique_lock<std::mutex> lock(connection_mutex);
+      auto connection = this->connection;
+      lock.unlock();
+      return connection;
+    }
+
   protected:
     bool internal_io_service = false;
-    std::unique_ptr<asio::ip::tcp::resolver> resolver;
 
     std::string host;
     unsigned short port;
     std::string path;
 
-    std::shared_ptr<Connection> current_connection; // TODO: remove?
+    std::shared_ptr<Connection> connection;
+    std::mutex connection_mutex;
 
     SocketClientBase(const std::string &host_port_path, unsigned short default_port) {
       size_t host_end = host_port_path.find(':');
@@ -280,9 +293,9 @@ namespace SimpleWeb {
       }
       else {
         if(host_port_end == std::string::npos)
-          port = (unsigned short)stoul(host_port_path.substr(host_end + 1));
+          port = static_cast<unsigned short>(stoul(host_port_path.substr(host_end + 1)));
         else
-          port = (unsigned short)stoul(host_port_path.substr(host_end + 1, host_port_end - (host_end + 1)));
+          port = static_cast<unsigned short>(stoul(host_port_path.substr(host_end + 1, host_port_end - (host_end + 1))));
       }
       if(host_port_end == std::string::npos)
         path = "/";
@@ -333,19 +346,19 @@ namespace SimpleWeb {
               static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
               if(header_it != connection->header.end() &&
                  Crypto::Base64::decode(header_it->second) == Crypto::sha1(*nonce_base64 + ws_magic_string)) {
-                if(on_open)
-                  on_open();
+                if(this->on_open)
+                  this->on_open();
                 read_message(connection);
               }
-              else if(on_error)
-                on_error(make_error_code::make_error_code(errc::protocol_error));
+              else if(this->on_error)
+                this->on_error(make_error_code::make_error_code(errc::protocol_error));
             }
-            else if(on_error)
-              on_error(ec);
+            else if(this->on_error)
+              this->on_error(ec);
           });
         }
-        else if(on_error)
-          on_error(ec);
+        else if(this->on_error)
+          this->on_error(ec);
       });
     }
 
@@ -353,7 +366,7 @@ namespace SimpleWeb {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t bytes_transferred) {
         if(!ec) {
           if(bytes_transferred == 0) { //TODO: This might happen on server at least, might also happen here
-            read_message(connection);
+            this->read_message(connection);
             return;
           }
           std::vector<unsigned char> first_bytes;
@@ -365,10 +378,9 @@ namespace SimpleWeb {
           //Close connection if masked message from server (protocol error)
           if(first_bytes[1] >= 128) {
             const std::string reason("message from server masked");
-            auto kept_connection = connection;
-            send_close(1002, reason, [this, kept_connection](const error_code & /*ec*/) {});
-            if(on_close)
-              on_close(1002, reason);
+            connection->send_close(1002, reason, [this](const error_code & /*ec*/) {});
+            if(this->on_close)
+              this->on_close(1002, reason);
             return;
           }
 
@@ -388,10 +400,10 @@ namespace SimpleWeb {
                   length += length_bytes[c] << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
-                read_message_content(connection);
+                this->read_message_content(connection);
               }
-              else if(on_error)
-                on_error(ec);
+              else if(this->on_error)
+                this->on_error(ec);
             });
           }
           else if(length == 127) {
@@ -408,19 +420,19 @@ namespace SimpleWeb {
                   length += length_bytes[c] << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
-                read_message_content(connection);
+                this->read_message_content(connection);
               }
-              else if(on_error)
-                on_error(ec);
+              else if(this->on_error)
+                this->on_error(ec);
             });
           }
           else {
             connection->message->length = length;
-            read_message_content(connection);
+            this->read_message_content(connection);
           }
         }
-        else if(on_error)
-          on_error(ec);
+        else if(this->on_error)
+          this->on_error(ec);
       });
     }
 
@@ -438,27 +450,27 @@ namespace SimpleWeb {
 
             auto reason = connection->message->string();
             auto kept_connection = connection;
-            send_close(status, reason, [this, kept_connection](const error_code & /*ec*/) {});
-            if(on_close)
-              on_close(status, reason);
+            connection->send_close(status, reason, [this, kept_connection](const error_code & /*ec*/) {});
+            if(this->on_close)
+              this->on_close(status, reason);
             return;
           }
           //If ping
           else if((connection->message->fin_rsv_opcode & 0x0f) == 9) {
             //send pong
             auto empty_send_stream = std::make_shared<SendStream>();
-            send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
+            connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
           }
-          else if(on_message) {
-            on_message(connection->message);
+          else if(this->on_message) {
+            this->on_message(connection->message);
           }
 
           //Next message
           connection->message = std::shared_ptr<Message>(new Message());
-          read_message(connection);
+          this->read_message(connection);
         }
-        else if(on_error)
-          on_error(ec);
+        else if(this->on_error)
+          this->on_error(ec);
       });
     }
   };
@@ -476,25 +488,26 @@ namespace SimpleWeb {
   protected:
     void connect() {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
-
-      resolver->async_resolve(query, [this](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+      auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
+      resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
         if(!ec) {
-          auto connection = std::shared_ptr<Connection>(new Connection(*io_service));
-          this->current_connection = connection;
+          std::unique_lock<std::mutex> lock(connection_mutex);
+          auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service));
+          lock.unlock();
 
-          asio::async_connect(*connection->socket, it, [this, connection](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+          asio::async_connect(*connection->socket, it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
               connection->socket->set_option(option);
 
-              handshake(connection);
+              this->handshake(connection);
             }
-            else if(on_error)
-              on_error(ec);
+            else if(this->on_error)
+              this->on_error(ec);
           });
         }
-        else if(on_error)
-          on_error(ec);
+        else if(this->on_error)
+          this->on_error(ec);
       });
     }
   };

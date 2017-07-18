@@ -19,7 +19,7 @@ int main() {
   //    wss.send("test");
   auto &echo = server.endpoint["^/echo/?$"];
 
-  echo.on_message = [&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
+  echo.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
     //WssServer::Message::string() is a convenience function for:
     //stringstream data_ss;
     //data_ss << message->rdbuf();
@@ -33,7 +33,7 @@ int main() {
     auto send_stream = make_shared<WssServer::SendStream>();
     *send_stream << message_str;
     //server.send is an asynchronous function
-    server.send(connection, send_stream, [](const SimpleWeb::error_code &ec) {
+    connection->send(send_stream, [](const SimpleWeb::error_code &ec) {
       if(ec) {
         cout << "Server: Error sending message. " <<
             //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
@@ -66,23 +66,23 @@ int main() {
   //    wss.onmessage=function(evt){console.log(evt.data);};
   //    wss.send("test");
   auto &echo_thrice = server.endpoint["^/echo_thrice/?$"];
-  echo_thrice.on_message = [&server](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
+  echo_thrice.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
     auto message_str = message->string();
 
     auto send_stream1 = make_shared<WssServer::SendStream>();
     *send_stream1 << message_str;
     //server.send is an asynchronous function
-    server.send(connection, send_stream1, [&server, connection, message_str](const SimpleWeb::error_code &ec) {
+    connection->send(send_stream1, [connection, message_str](const SimpleWeb::error_code &ec) {
       if(!ec) {
         auto send_stream3 = make_shared<WssServer::SendStream>();
         *send_stream3 << message_str;
-        server.send(connection, send_stream3); //Sent after send_stream1 is sent, and most likely after send_stream2
+        connection->send(send_stream3); //Sent after send_stream1 is sent, and most likely after send_stream2
       }
     });
     //Do not reuse send_stream1 here as it most likely is not sent yet
     auto send_stream2 = make_shared<WssServer::SendStream>();
     *send_stream2 << message_str;
-    server.send(connection, send_stream2); //Most likely queued, and sent after send_stream1
+    connection->send(send_stream2); //Most likely queued, and sent after send_stream1
   };
 
   //Example 3: Echo to all WebSocket Secure endpoints
@@ -101,7 +101,7 @@ int main() {
       *send_stream << message_str;
 
       //server.send is an asynchronous function
-      server.send(a_connection, send_stream);
+      a_connection->send(send_stream);
     }
   };
 
@@ -132,7 +132,7 @@ int main() {
     cout << "Client: Message received: \"" << message_str << "\"" << endl;
 
     cout << "Client: Sending close connection" << endl;
-    client.send_close(1000);
+    client.get_connection()->send_close(1000);
   };
 
   client.on_open = [&client]() {
@@ -143,7 +143,7 @@ int main() {
 
     auto send_stream = make_shared<WssClient::SendStream>();
     *send_stream << message;
-    client.send(send_stream);
+    client.get_connection()->send(send_stream);
   };
 
   client.on_close = [](int status, const string & /*reason*/) {

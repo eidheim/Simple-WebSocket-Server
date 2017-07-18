@@ -43,13 +43,14 @@ namespace SimpleWeb {
 
     void connect() {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
-
-      resolver->async_resolve(query, [this](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+      auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
+      resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
         if(!ec) {
-          auto connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
-          current_connection = connection;
+          std::unique_lock<std::mutex> lock(connection_mutex);
+          auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
+          lock.unlock();
 
-          asio::async_connect(connection->socket->lowest_layer(), it, [this, connection](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+          asio::async_connect(connection->socket->lowest_layer(), it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
               connection->socket->lowest_layer().set_option(option);
