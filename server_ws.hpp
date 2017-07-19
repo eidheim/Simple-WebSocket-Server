@@ -129,63 +129,6 @@ namespace SimpleWeb {
           timer->cancel();
       }
 
-      bool parse_handshake() {
-        std::istream stream(&read_buffer);
-        std::string line;
-        getline(stream, line);
-        size_t method_end;
-        if((method_end = line.find(' ')) != std::string::npos) {
-          method = line.substr(0, method_end);
-
-          size_t query_start = std::string::npos;
-          size_t path_and_query_string_end = std::string::npos;
-          for(size_t i = method_end + 1; i < line.size(); ++i) {
-            if(line[i] == '?' && (i + 1) < line.size())
-              query_start = i + 1;
-            else if(line[i] == ' ') {
-              path_and_query_string_end = i;
-              break;
-            }
-          }
-          if(path_and_query_string_end != std::string::npos) {
-            if(query_start != std::string::npos) {
-              path = line.substr(method_end + 1, query_start - method_end - 2);
-              query_string = line.substr(query_start, path_and_query_string_end - query_start);
-            }
-            else
-              path = line.substr(method_end + 1, path_and_query_string_end - method_end - 1);
-
-            size_t protocol_end;
-            if((protocol_end = line.find('/', path_and_query_string_end + 1)) != std::string::npos) {
-              if(line.compare(path_and_query_string_end + 1, protocol_end - path_and_query_string_end - 1, "HTTP") != 0)
-                return false;
-              http_version = line.substr(protocol_end + 1, line.size() - protocol_end - 2);
-            }
-            else
-              return false;
-
-            getline(stream, line);
-            size_t param_end;
-            while((param_end = line.find(':')) != std::string::npos) {
-              size_t value_start = param_end + 1;
-              if(value_start < line.size()) {
-                if(line[value_start] == ' ')
-                  value_start++;
-                if(value_start < line.size())
-                  header.emplace(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1));
-              }
-
-              getline(stream, line);
-            }
-          }
-          else
-            return false;
-        }
-        else
-          return false;
-        return true;
-      }
-
       bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) {
         std::ostream handshake(write_buffer.get());
 
@@ -509,7 +452,8 @@ namespace SimpleWeb {
       asio::async_read_until(*connection->socket, connection->read_buffer, "\r\n\r\n", [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
         connection->cancel_timeout();
         if(!ec) {
-          if(connection->parse_handshake())
+          std::istream stream(&connection->read_buffer);
+          if(RequestMessage::parse(stream, connection->method, connection->path, connection->query_string, connection->http_version, connection->header))
             write_handshake(connection);
         }
       });

@@ -23,7 +23,8 @@ public:
     ss << "TestHeader3:test3b\r\n";
     ss << "\r\n";
 
-    connection->parse_handshake();
+    std::istream stream(&connection->read_buffer);
+    assert(RequestMessage::parse(stream, connection->method, connection->path, connection->query_string, connection->http_version, connection->header));
 
     assert(connection->method == "GET");
     assert(connection->path == "/test/");
@@ -92,7 +93,7 @@ public:
     stream << "TestHeader3:test3b\r\n";
     stream << "\r\n";
 
-    connection->parse_handshake();
+    assert(ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header));
 
     assert(connection->header.size() == 4);
     auto header_it = connection->header.find("TestHeader");

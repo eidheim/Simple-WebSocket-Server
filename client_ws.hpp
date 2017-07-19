@@ -81,32 +81,6 @@ namespace SimpleWeb {
         socket->lowest_layer().close(ec);
       }
 
-      void parse_handshake() {
-        std::string line;
-        getline(*message, line);
-        size_t version_end = line.find(' ');
-        if(version_end != std::string::npos) {
-          if(5 < line.size())
-            http_version = line.substr(5, version_end - 5);
-          if((version_end + 1) < line.size())
-            status_code = line.substr(version_end + 1, line.size() - (version_end + 1) - 1);
-
-          getline(*message, line);
-          size_t param_end;
-          while((param_end = line.find(':')) != std::string::npos) {
-            size_t value_start = param_end + 1;
-            if((value_start) < line.size()) {
-              if(line[value_start] == ' ')
-                value_start++;
-              if(value_start < line.size())
-                header.insert(std::make_pair(line.substr(0, param_end), line.substr(value_start, line.size() - value_start - 1)));
-            }
-
-            getline(*message, line);
-          }
-        }
-      }
-
       asio::strand strand;
 
       class SendData {
@@ -350,7 +324,11 @@ namespace SimpleWeb {
         if(!ec) {
           asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
             if(!ec) {
-              connection->parse_handshake();
+              if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header)) {
+                if(this->on_error)
+                  this->on_error(make_error_code::make_error_code(errc::protocol_error));
+                return;
+              }
               auto header_it = connection->header.find("Sec-WebSocket-Accept");
               static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
               if(header_it != connection->header.end() &&
