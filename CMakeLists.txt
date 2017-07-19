@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8)
 project (Simple-WebSocket-Server)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra")
 
-set(BOOST_COMPONENTS system coroutine context thread)
+set(BOOST_COMPONENTS system coroutine context)
 # Late 2017 TODO: remove the following checks and always use std::regex
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
