@@ -45,11 +45,10 @@ namespace SimpleWeb {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
       resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        std::unique_lock<std::mutex> lock(connection_mutex);
+        auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
+        lock.unlock();
         if(!ec) {
-          std::unique_lock<std::mutex> lock(connection_mutex);
-          auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
-          lock.unlock();
-
           asio::async_connect(connection->socket->lowest_layer(), it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
@@ -59,15 +58,15 @@ namespace SimpleWeb {
                 if(!ec)
                   handshake(connection);
                 else if(on_error)
-                  on_error(ec);
+                  on_error(connection, ec);
               });
             }
             else if(on_error)
-              on_error(ec);
+              on_error(connection, ec);
           });
         }
         else if(on_error)
-          on_error(ec);
+          on_error(connection, ec);
       });
     }
   };

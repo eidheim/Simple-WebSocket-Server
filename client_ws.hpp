@@ -216,10 +216,10 @@ namespace SimpleWeb {
       asio::streambuf streambuf;
     };
 
-    std::function<void(void)> on_open;
-    std::function<void(std::shared_ptr<Message>)> on_message;
-    std::function<void(int, const std::string &)> on_close;
-    std::function<void(const error_code &)> on_error;
+    std::function<void(std::shared_ptr<Connection>)> on_open;
+    std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
+    std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
+    std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
 
     void start() {
       if(!io_service) {
@@ -249,13 +249,6 @@ namespace SimpleWeb {
 
     /// If you have your own asio::io_service, store its pointer here before running start().
     std::shared_ptr<asio::io_service> io_service;
-
-    std::shared_ptr<Connection> get_connection() {
-      std::unique_lock<std::mutex> lock(connection_mutex);
-      auto connection = this->connection;
-      lock.unlock();
-      return connection;
-    }
 
   protected:
     bool internal_io_service = false;
@@ -326,7 +319,7 @@ namespace SimpleWeb {
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header)) {
                 if(this->on_error)
-                  this->on_error(make_error_code::make_error_code(errc::protocol_error));
+                  this->on_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
               auto header_it = connection->header.find("Sec-WebSocket-Accept");
@@ -334,18 +327,18 @@ namespace SimpleWeb {
               if(header_it != connection->header.end() &&
                  Crypto::Base64::decode(header_it->second) == Crypto::sha1(*nonce_base64 + ws_magic_string)) {
                 if(this->on_open)
-                  this->on_open();
+                  this->on_open(connection);
                 read_message(connection);
               }
               else if(this->on_error)
-                this->on_error(make_error_code::make_error_code(errc::protocol_error));
+                this->on_error(connection, make_error_code::make_error_code(errc::protocol_error));
             }
             else if(this->on_error)
-              this->on_error(ec);
+              this->on_error(connection, ec);
           });
         }
         else if(this->on_error)
-          this->on_error(ec);
+          this->on_error(connection, ec);
       });
     }
 
@@ -367,7 +360,7 @@ namespace SimpleWeb {
             const std::string reason("message from server masked");
             connection->send_close(1002, reason, [this](const error_code & /*ec*/) {});
             if(this->on_close)
-              this->on_close(1002, reason);
+              this->on_close(connection, 1002, reason);
             return;
           }
 
@@ -390,7 +383,7 @@ namespace SimpleWeb {
                 this->read_message_content(connection);
               }
               else if(this->on_error)
-                this->on_error(ec);
+                this->on_error(connection, ec);
             });
           }
           else if(length == 127) {
@@ -410,7 +403,7 @@ namespace SimpleWeb {
                 this->read_message_content(connection);
               }
               else if(this->on_error)
-                this->on_error(ec);
+                this->on_error(connection, ec);
             });
           }
           else {
@@ -419,7 +412,7 @@ namespace SimpleWeb {
           }
         }
         else if(this->on_error)
-          this->on_error(ec);
+          this->on_error(connection, ec);
       });
     }
 
@@ -439,7 +432,7 @@ namespace SimpleWeb {
             auto kept_connection = connection;
             connection->send_close(status, reason, [this, kept_connection](const error_code & /*ec*/) {});
             if(this->on_close)
-              this->on_close(status, reason);
+              this->on_close(connection, status, reason);
             return;
           }
           // If ping
@@ -449,7 +442,7 @@ namespace SimpleWeb {
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
           }
           else if(this->on_message) {
-            this->on_message(connection->message);
+            this->on_message(connection, connection->message);
           }
 
           // Next message
@@ -457,7 +450,7 @@ namespace SimpleWeb {
           this->read_message(connection);
         }
         else if(this->on_error)
-          this->on_error(ec);
+          this->on_error(connection, ec);
       });
     }
   };
@@ -477,11 +470,10 @@ namespace SimpleWeb {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
       resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        std::unique_lock<std::mutex> lock(connection_mutex);
+        auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service));
+        lock.unlock();
         if(!ec) {
-          std::unique_lock<std::mutex> lock(connection_mutex);
-          auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service));
-          lock.unlock();
-
           asio::async_connect(*connection->socket, it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
@@ -490,11 +482,11 @@ namespace SimpleWeb {
               this->handshake(connection);
             }
             else if(this->on_error)
-              this->on_error(ec);
+              this->on_error(connection, ec);
           });
         }
         else if(this->on_error)
-          this->on_error(ec);
+          this->on_error(connection, ec);
       });
     }
   };

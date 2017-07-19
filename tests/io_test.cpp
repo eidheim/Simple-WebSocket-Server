@@ -86,33 +86,33 @@ int main() {
     atomic<int> client_callback_count(0);
     atomic<bool> closed(false);
 
-    client.on_message = [&](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
 
       assert(!closed);
 
-      client.get_connection()->send_close(1000);
+      connection->send_close(1000);
     };
 
-    client.on_open = [&]() {
+    client.on_open = [&](shared_ptr<WsClient::Connection> connection) {
       ++client_callback_count;
 
       assert(!closed);
 
       auto send_stream = make_shared<WsClient::SendStream>();
       *send_stream << "Hello";
-      client.get_connection()->send(send_stream);
+      connection->send(send_stream);
     };
 
-    client.on_close = [&](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](shared_ptr<WsClient::Connection> /*connection*/, int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
       assert(!closed);
       closed = true;
     };
 
-    client.on_error = [](const SimpleWeb::error_code &ec) {
+    client.on_error = [](shared_ptr<WsClient::Connection> /*connection*/, const SimpleWeb::error_code &ec) {
       cerr << ec.message() << endl;
       assert(false);
     };
@@ -137,7 +137,7 @@ int main() {
     atomic<int> client_callback_count(0);
     atomic<bool> closed(false);
 
-    client.on_message = [&](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
@@ -145,26 +145,26 @@ int main() {
       assert(!closed);
 
       if(client_callback_count == 4)
-        client.get_connection()->send_close(1000);
+        connection->send_close(1000);
     };
 
-    client.on_open = [&]() {
+    client.on_open = [&](shared_ptr<WsClient::Connection> connection) {
       ++client_callback_count;
 
       assert(!closed);
 
       auto send_stream = make_shared<WsClient::SendStream>();
       *send_stream << "Hello";
-      client.get_connection()->send(send_stream);
+      connection->send(send_stream);
     };
 
-    client.on_close = [&](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](shared_ptr<WsClient::Connection> /*connection*/, int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
       assert(!closed);
       closed = true;
     };
 
-    client.on_error = [](const SimpleWeb::error_code &ec) {
+    client.on_error = [](shared_ptr<WsClient::Connection> /*connection*/, const SimpleWeb::error_code &ec) {
       cerr << ec.message() << endl;
       assert(false);
     };
@@ -189,7 +189,7 @@ int main() {
     atomic<int> client_callback_count(0);
     atomic<bool> closed(false);
 
-    client.on_message = [&](shared_ptr<WsClient::Message> message) {
+    client.on_message = [&](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message) {
       assert(message->string() == "Hello");
 
       ++client_callback_count;
@@ -197,10 +197,10 @@ int main() {
       assert(!closed);
 
       if(client_callback_count == 201)
-        client.get_connection()->send_close(1000);
+        connection->send_close(1000);
     };
 
-    client.on_open = [&]() {
+    client.on_open = [&](shared_ptr<WsClient::Connection> connection) {
       ++client_callback_count;
 
       assert(!closed);
@@ -208,17 +208,17 @@ int main() {
       for(size_t i = 0; i < 200; ++i) {
         auto send_stream = make_shared<WsClient::SendStream>();
         *send_stream << "Hello";
-        client.get_connection()->send(send_stream);
+        connection->send(send_stream);
       }
     };
 
-    client.on_close = [&](int /*status*/, const string & /*reason*/) {
+    client.on_close = [&](shared_ptr<WsClient::Connection> /*connection*/, int /*status*/, const string & /*reason*/) {
       ++client_callback_count;
       assert(!closed);
       closed = true;
     };
 
-    client.on_error = [](const SimpleWeb::error_code &ec) {
+    client.on_error = [](shared_ptr<WsClient::Connection> /*connection*/, const SimpleWeb::error_code &ec) {
       cerr << ec.message() << endl;
       assert(false);
     };
