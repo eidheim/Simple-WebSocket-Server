@@ -41,7 +41,7 @@ namespace SimpleWeb {
   protected:
     asio::ssl::context context;
 
-    void connect() {
+    void connect() override {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
       resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {

@@ -34,7 +34,7 @@ namespace SimpleWeb {
       }
     }
 
-    void start() {
+    void start() override {
       if(set_session_id_context) {
         // Creating session_id_context from address:port but reversed due to small SSL_MAX_SSL_SESSION_ID_LENGTH
         session_id_context = std::to_string(config.port) + ':';
@@ -48,7 +48,7 @@ namespace SimpleWeb {
   protected:
     asio::ssl::context context;
 
-    void accept() {
+    void accept() override {
       std::shared_ptr<Connection> connection(new Connection(config.timeout_idle, *io_service, context));
 
       acceptor->async_accept(connection->socket->lowest_layer(), [this, connection](const error_code &ec) {

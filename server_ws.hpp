@@ -45,8 +45,6 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketServerBase {
   public:
-    virtual ~SocketServerBase() {}
-
     class SendStream : public std::ostream {
       friend class SocketServerBase<socket_type>;
 
@@ -54,8 +52,8 @@ namespace SimpleWeb {
       asio::streambuf streambuf;
 
     public:
-      SendStream() : std::ostream(&streambuf) {}
-      size_t size() {
+      SendStream() noexcept : std::ostream(&streambuf) {}
+      size_t size() noexcept {
         return streambuf.size();
       }
     };
@@ -65,7 +63,7 @@ namespace SimpleWeb {
       friend class SocketServer<socket_type>;
 
     public:
-      Connection(std::unique_ptr<socket_type> &&socket) : socket(std::move(socket)), timeout_idle(0), strand(this->socket->get_io_service()), closed(false) {}
+      Connection(std::unique_ptr<socket_type> &&socket) noexcept : socket(std::move(socket)), timeout_idle(0), strand(this->socket->get_io_service()), closed(false) {}
 
       std::string method, path, query_string, http_version;
 
@@ -78,7 +76,7 @@ namespace SimpleWeb {
 
     private:
       template <typename... Args>
-      Connection(long timeout_idle, Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), timeout_idle(timeout_idle), strand(socket->get_io_service()), closed(false) {}
+      Connection(long timeout_idle, Args &&... args) noexcept : socket(new socket_type(std::forward<Args>(args)...)), timeout_idle(timeout_idle), strand(socket->get_io_service()), closed(false) {}
 
       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
       std::mutex socket_close_mutex;
@@ -89,14 +87,14 @@ namespace SimpleWeb {
       std::unique_ptr<asio::deadline_timer> timer;
       std::mutex timer_mutex;
 
-      void close() {
+      void close() noexcept {
         error_code ec;
         std::unique_lock<std::mutex> lock(socket_close_mutex); // The following operations seems to be needed to run sequentially
         socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         socket->lowest_layer().close(ec);
       }
 
-      void set_timeout(long seconds = -1) {
+      void set_timeout(long seconds = -1) noexcept {
         bool use_timeout_idle = false;
         if(seconds == -1) {
           use_timeout_idle = true;
@@ -123,13 +121,15 @@ namespace SimpleWeb {
         });
       }
 
-      void cancel_timeout() {
+      void cancel_timeout() noexcept {
         std::unique_lock<std::mutex> lock(timer_mutex);
-        if(timer)
-          timer->cancel();
+        if(timer) {
+          error_code ec;
+          timer->cancel(ec);
+        }
       }
 
-      bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) {
+      bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) noexcept {
         std::ostream handshake(write_buffer.get());
 
         auto header_it = header.find("Sec-WebSocket-Key");
@@ -153,7 +153,7 @@ namespace SimpleWeb {
       class SendData {
       public:
         SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
-                 std::function<void(const error_code)> &&callback)
+                 std::function<void(const error_code)> &&callback) noexcept
             : header_stream(std::move(header_stream)), message_stream(std::move(message_stream)), callback(std::move(callback)) {}
         std::shared_ptr<SendStream> header_stream;
         std::shared_ptr<SendStream> message_stream;
@@ -162,7 +162,7 @@ namespace SimpleWeb {
 
       std::list<SendData> send_queue;
 
-      void send_from_queue() {
+      void send_from_queue() noexcept {
         auto self = this->shared_from_this();
         strand.post([self]() {
           asio::async_write(*self->socket, self->send_queue.begin()->header_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
@@ -192,7 +192,7 @@ namespace SimpleWeb {
 
       std::atomic<bool> closed;
 
-      void read_remote_endpoint_data() {
+      void read_remote_endpoint_data() noexcept {
         try {
           remote_endpoint_address = socket->lowest_layer().remote_endpoint().address().to_string();
           remote_endpoint_port = socket->lowest_layer().remote_endpoint().port();
@@ -205,7 +205,7 @@ namespace SimpleWeb {
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
       void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
-                unsigned char fin_rsv_opcode = 129) {
+                unsigned char fin_rsv_opcode = 129) noexcept {
         cancel_timeout();
         set_timeout();
 
@@ -241,7 +241,7 @@ namespace SimpleWeb {
         });
       }
 
-      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
+      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) noexcept {
         // Send close only once (in case close is initiated by server)
         if(closed)
           return;
@@ -264,17 +264,22 @@ namespace SimpleWeb {
 
     public:
       unsigned char fin_rsv_opcode;
-      size_t size() {
+      size_t size() noexcept {
         return length;
       }
-      std::string string() {
-        std::stringstream ss;
-        ss << rdbuf();
-        return ss.str();
+      std::string string() noexcept {
+        try {
+          std::stringstream ss;
+          ss << rdbuf();
+          return ss.str();
+        }
+        catch(...) {
+          return std::string();
+        }
       }
 
     private:
-      Message() : std::istream(&streambuf) {}
+      Message() noexcept : std::istream(&streambuf) {}
       size_t length;
       asio::streambuf streambuf;
     };
@@ -292,7 +297,7 @@ namespace SimpleWeb {
       std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
       std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
 
-      std::unordered_set<std::shared_ptr<Connection>> get_connections() {
+      std::unordered_set<std::shared_ptr<Connection>> get_connections() noexcept {
         std::lock_guard<std::mutex> lock(connections_mutex);
         auto copy = connections;
         return copy;
@@ -303,7 +308,7 @@ namespace SimpleWeb {
       friend class SocketServerBase<socket_type>;
 
     private:
-      Config(unsigned short port) : port(port) {}
+      Config(unsigned short port) noexcept : port(port) {}
 
     public:
       /// Port number to use. Defaults to 80 for HTTP and 443 for HTTPS.
@@ -331,7 +336,7 @@ namespace SimpleWeb {
     public:
       regex_orderable(const char *regex_cstr) : regex::regex(regex_cstr), str(regex_cstr) {}
       regex_orderable(const std::string &regex_str) : regex::regex(regex_str), str(regex_str) {}
-      bool operator<(const regex_orderable &rhs) const {
+      bool operator<(const regex_orderable &rhs) const noexcept {
         return str < rhs.str;
       }
     };
@@ -382,7 +387,7 @@ namespace SimpleWeb {
       }
     }
 
-    void stop() {
+    void stop() noexcept {
       if(acceptor) {
         error_code ec;
         acceptor->close(ec);
@@ -399,7 +404,9 @@ namespace SimpleWeb {
       }
     }
 
-    std::unordered_set<std::shared_ptr<Connection>> get_connections() {
+    virtual ~SocketServerBase() noexcept {}
+
+    std::unordered_set<std::shared_ptr<Connection>> get_connections() noexcept {
       std::unordered_set<std::shared_ptr<Connection>> all_connections;
       for(auto &e : endpoint) {
         std::lock_guard<std::mutex> lock(e.second.connections_mutex);
@@ -427,7 +434,7 @@ namespace SimpleWeb {
      *   socket_server.upgrade(connection);
      * }
      */
-    void upgrade(const std::shared_ptr<Connection> &connection) {
+    void upgrade(const std::shared_ptr<Connection> &connection) noexcept {
       connection->timeout_idle = config.timeout_idle;
       write_handshake(connection);
     }
@@ -441,7 +448,7 @@ namespace SimpleWeb {
     std::unique_ptr<asio::ip::tcp::acceptor> acceptor;
     std::vector<std::thread> threads;
 
-    SocketServerBase(unsigned short port) : config(port) {}
+    SocketServerBase(unsigned short port) noexcept : config(port) {}
 
     virtual void accept() = 0;
 
@@ -483,7 +490,7 @@ namespace SimpleWeb {
       }
     }
 
-    void read_message(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const {
+    void read_message(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const noexcept {
       asio::async_read(*connection->socket, connection->read_buffer, asio::transfer_exactly(2), [this, connection, &endpoint](const error_code &ec, size_t bytes_transferred) {
         if(!ec) {
           if(bytes_transferred == 0) { // TODO: why does this happen sometimes?
@@ -613,7 +620,7 @@ namespace SimpleWeb {
       });
     }
 
-    void connection_open(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) {
+    void connection_open(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const {
       connection->cancel_timeout();
       connection->set_timeout();
 
@@ -661,10 +668,10 @@ namespace SimpleWeb {
   template <>
   class SocketServer<WS> : public SocketServerBase<WS> {
   public:
-    SocketServer() : SocketServerBase<WS>(80) {}
+    SocketServer() noexcept : SocketServerBase<WS>(80) {}
 
   protected:
-    void accept() {
+    void accept() override {
       std::shared_ptr<Connection> connection(new Connection(config.timeout_idle, *io_service));
 
       acceptor->async_accept(*connection->socket, [this, connection](const error_code &ec) {

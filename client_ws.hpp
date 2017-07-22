@@ -38,8 +38,6 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketClientBase {
   public:
-    virtual ~SocketClientBase() {}
-
     class SendStream : public std::iostream {
       friend class SocketClientBase<socket_type>;
 
@@ -47,8 +45,8 @@ namespace SimpleWeb {
       asio::streambuf streambuf;
 
     public:
-      SendStream() : std::iostream(&streambuf) {}
-      size_t size() {
+      SendStream() noexcept : std::iostream(&streambuf) {}
+      size_t size() noexcept {
         return streambuf.size();
       }
     };
@@ -67,14 +65,14 @@ namespace SimpleWeb {
 
     private:
       template <typename... Args>
-      Connection(Args &&... args) : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
+      Connection(Args &&... args) noexcept : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
 
       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
       std::mutex socket_close_mutex;
 
       std::shared_ptr<Message> message;
 
-      void close() {
+      void close() noexcept {
         error_code ec;
         std::unique_lock<std::mutex> lock(socket_close_mutex); // The following operations seems to be needed to run sequentially
         socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
@@ -85,7 +83,7 @@ namespace SimpleWeb {
 
       class SendData {
       public:
-        SendData(std::shared_ptr<SendStream> send_stream, std::function<void(const error_code)> &&callback)
+        SendData(std::shared_ptr<SendStream> send_stream, std::function<void(const error_code)> &&callback) noexcept
             : send_stream(std::move(send_stream)), callback(std::move(callback)) {}
         std::shared_ptr<SendStream> send_stream;
         std::function<void(const error_code)> callback;
@@ -93,7 +91,7 @@ namespace SimpleWeb {
 
       std::list<SendData> send_queue;
 
-      void send_from_queue() {
+      void send_from_queue() noexcept {
         auto self = this->shared_from_this();
         strand.post([self]() {
           asio::async_write(*self->socket, self->send_queue.begin()->send_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
@@ -113,7 +111,7 @@ namespace SimpleWeb {
 
       std::atomic<bool> closed;
 
-      void read_remote_endpoint_data() {
+      void read_remote_endpoint_data() noexcept {
         try {
           remote_endpoint_address = socket->lowest_layer().remote_endpoint().address().to_string();
           remote_endpoint_port = socket->lowest_layer().remote_endpoint().port();
@@ -127,7 +125,7 @@ namespace SimpleWeb {
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
       void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
-                unsigned char fin_rsv_opcode = 129) {
+                unsigned char fin_rsv_opcode = 129) noexcept {
         // Create mask
         std::vector<unsigned char> mask;
         mask.resize(4);
@@ -177,7 +175,7 @@ namespace SimpleWeb {
         });
       }
 
-      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
+      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) noexcept {
         // Send close only once (in case close is initiated by client)
         if(closed)
           return;
@@ -201,17 +199,22 @@ namespace SimpleWeb {
 
     public:
       unsigned char fin_rsv_opcode;
-      size_t size() {
+      size_t size() noexcept {
         return length;
       }
-      std::string string() {
-        std::stringstream ss;
-        ss << rdbuf();
-        return ss.str();
+      std::string string() noexcept {
+        try {
+          std::stringstream ss;
+          ss << rdbuf();
+          return ss.str();
+        }
+        catch(...) {
+          return std::string();
+        }
       }
 
     private:
-      Message() : std::istream(&streambuf) {}
+      Message() noexcept : std::istream(&streambuf) {}
       size_t length;
       asio::streambuf streambuf;
     };
@@ -236,7 +239,7 @@ namespace SimpleWeb {
         io_service->run();
     }
 
-    void stop() {
+    void stop() noexcept {
       {
         std::unique_lock<std::mutex> lock(connection_mutex);
         if(connection)
@@ -246,6 +249,8 @@ namespace SimpleWeb {
       if(internal_io_service)
         io_service->stop();
     }
+
+    virtual ~SocketClientBase() noexcept {}
 
     /// If you have your own asio::io_service, store its pointer here before running start().
     std::shared_ptr<asio::io_service> io_service;
@@ -260,7 +265,7 @@ namespace SimpleWeb {
     std::shared_ptr<Connection> connection;
     std::mutex connection_mutex;
 
-    SocketClientBase(const std::string &host_port_path, unsigned short default_port) {
+    SocketClientBase(const std::string &host_port_path, unsigned short default_port) noexcept {
       size_t host_end = host_port_path.find(':');
       size_t host_port_end = host_port_path.find('/');
       if(host_end == std::string::npos) {
@@ -463,10 +468,10 @@ namespace SimpleWeb {
   template <>
   class SocketClient<WS> : public SocketClientBase<WS> {
   public:
-    SocketClient(const std::string &server_port_path) : SocketClientBase<WS>::SocketClientBase(server_port_path, 80){};
+    SocketClient(const std::string &server_port_path) noexcept : SocketClientBase<WS>::SocketClientBase(server_port_path, 80){};
 
   protected:
-    void connect() {
+    void connect() override {
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
       resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
