@@ -129,7 +129,7 @@ namespace SimpleWeb {
         }
       }
 
-      bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) noexcept {
+      bool generate_handshake(const std::shared_ptr<asio::streambuf> &write_buffer) {
         std::ostream handshake(write_buffer.get());
 
         auto header_it = header.find("Sec-WebSocket-Key");
@@ -162,7 +162,7 @@ namespace SimpleWeb {
 
       std::list<SendData> send_queue;
 
-      void send_from_queue() noexcept {
+      void send_from_queue() {
         auto self = this->shared_from_this();
         strand.post([self]() {
           asio::async_write(*self->socket, self->send_queue.begin()->header_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
@@ -205,7 +205,7 @@ namespace SimpleWeb {
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
       void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
-                unsigned char fin_rsv_opcode = 129) noexcept {
+                unsigned char fin_rsv_opcode = 129) {
         cancel_timeout();
         set_timeout();
 
@@ -241,7 +241,7 @@ namespace SimpleWeb {
         });
       }
 
-      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) noexcept {
+      void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
         // Send close only once (in case close is initiated by server)
         if(closed)
           return;
@@ -434,7 +434,7 @@ namespace SimpleWeb {
      *   socket_server.upgrade(connection);
      * }
      */
-    void upgrade(const std::shared_ptr<Connection> &connection) noexcept {
+    void upgrade(const std::shared_ptr<Connection> &connection) {
       connection->timeout_idle = config.timeout_idle;
       write_handshake(connection);
     }
@@ -490,7 +490,7 @@ namespace SimpleWeb {
       }
     }
 
-    void read_message(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const noexcept {
+    void read_message(const std::shared_ptr<Connection> &connection, Endpoint &endpoint) const {
       asio::async_read(*connection->socket, connection->read_buffer, asio::transfer_exactly(2), [this, connection, &endpoint](const error_code &ec, size_t bytes_transferred) {
         if(!ec) {
           if(bytes_transferred == 0) { // TODO: why does this happen sometimes?
