@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.2)
 project (Simple-WebSocket-Server)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 option(USE_SSL "Uses OpenSSL" OFF)
+option(BUILD_EXAMPLES "Compiles also the examples" ON)
 
 #if windows is used, use cppan. the dependencies are declared in cppan.yml
 if (WIN32)
@@ -37,6 +38,7 @@ ELSE()
 		find_package(OpenSSL REQUIRED)
 		MESSAGE(STATUS "OPENSSL: ${OPENSSL_LIBRARIES}")
 		include_directories(${OPENSSL_INCLUDE_DIR})
+		add_definitions(-DUSE_SSL)
 	ENDIF(USE_SSL)
 	
 	SET(DEP_LIBS ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${OPENSSL_CRYPTO_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
@@ -49,8 +51,10 @@ find_package(Threads REQUIRED)
 
 include_directories(.)
 
-add_executable(ws_examples ws_examples.cpp)
-target_link_libraries(ws_examples ${CMAKE_THREAD_LIBS_INIT} ${DEP_LIBS})
+IF(BUILD_EXAMPLES)
+	add_executable(ws_examples ws_examples.cpp)
+	target_link_libraries(ws_examples ${CMAKE_THREAD_LIBS_INIT} ${DEP_LIBS})
+ENDIF(BUILD_EXAMPLES)
 
 if(USE_SSL)
 	add_executable(wss_examples wss_examples.cpp)
