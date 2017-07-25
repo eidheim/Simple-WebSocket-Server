@@ -1,9 +1,7 @@
 #ifndef CLIENT_WS_HPP
 #define	CLIENT_WS_HPP
 
-#ifdef DUSE_SSL
-    #include "crypto.hpp"
-#endif
+#include "crypto.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -324,7 +322,6 @@ namespace SimpleWeb {
         virtual void connect()=0;
         
         void handshake() {
-            #ifdef USE_SSL
             connection->read_remote_endpoint_data();
             
             auto write_buffer=std::make_shared<boost::asio::streambuf>();
@@ -377,7 +374,6 @@ namespace SimpleWeb {
                 else if(on_error)
                     on_error(ec);
             });
-            #endif
         }
         
         void parse_handshake(std::istream& stream) const {

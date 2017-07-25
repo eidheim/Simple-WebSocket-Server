@@ -1,9 +1,7 @@
 #ifndef SERVER_WS_HPP
 #define	SERVER_WS_HPP
 
-#ifdef DUSE_SSL
-    #include "crypto.hpp"
-#endif
+#include "crypto.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
@@ -516,7 +514,6 @@ namespace SimpleWeb {
         }
         
         bool generate_handshake(const std::shared_ptr<Connection> &connection, std::ostream& handshake) const {
-            #ifdef USE_SSL
                 auto header_it=connection->header.find("Sec-WebSocket-Key");
                 if(header_it==connection->header.end())
                     return false;
@@ -528,7 +525,6 @@ namespace SimpleWeb {
                 handshake << "Connection: Upgrade\r\n";
                 handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
                 handshake << "\r\n";
-            #endif
             
             return true;
         }
