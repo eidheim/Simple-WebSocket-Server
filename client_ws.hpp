@@ -65,7 +65,10 @@ namespace SimpleWeb {
 
     private:
       template <typename... Args>
-      Connection(Args &&... args) noexcept : socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
+      Connection(std::shared_ptr<ScopeRunner> handler_runner, Args &&... args) noexcept
+          : handler_runner(std::move(handler_runner)), socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
+
+      std::shared_ptr<ScopeRunner> handler_runner;
 
       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
       std::mutex socket_close_mutex;
@@ -95,6 +98,9 @@ namespace SimpleWeb {
         auto self = this->shared_from_this();
         strand.post([self]() {
           asio::async_write(*self->socket, self->send_queue.begin()->send_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+            auto lock = self->handler_runner->continue_lock();
+            if(!lock)
+              return;
             auto send_queued = self->send_queue.begin();
             if(send_queued->callback)
               send_queued->callback(ec);
@@ -251,7 +257,10 @@ namespace SimpleWeb {
         io_service->stop();
     }
 
-    virtual ~SocketClientBase() noexcept {}
+    virtual ~SocketClientBase() noexcept {
+      handler_runner->stop();
+      stop();
+    }
 
     /// If you have your own asio::io_service, store its pointer here before running start().
     std::shared_ptr<asio::io_service> io_service;
@@ -266,7 +275,9 @@ namespace SimpleWeb {
     std::shared_ptr<Connection> connection;
     std::mutex connection_mutex;
 
-    SocketClientBase(const std::string &host_port_path, unsigned short default_port) noexcept {
+    std::shared_ptr<ScopeRunner> handler_runner;
+
+    SocketClientBase(const std::string &host_port_path, unsigned short default_port) noexcept : handler_runner(new ScopeRunner()) {
       size_t host_end = host_port_path.find(':');
       size_t host_port_end = host_port_path.find('/');
       if(host_end == std::string::npos) {
@@ -320,8 +331,14 @@ namespace SimpleWeb {
       connection->message = std::shared_ptr<Message>(new Message());
 
       asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+        auto lock = connection->handler_runner->continue_lock();
+        if(!lock)
+          return;
         if(!ec) {
           asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+            auto lock = connection->handler_runner->continue_lock();
+            if(!lock)
+              return;
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
                  connection->status_code != "101 Web Socket Protocol Handshake") {
@@ -351,6 +368,9 @@ namespace SimpleWeb {
 
     void read_message(const std::shared_ptr<Connection> &connection) {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t bytes_transferred) {
+        auto lock = connection->handler_runner->continue_lock();
+        if(!lock)
+          return;
         if(!ec) {
           if(bytes_transferred == 0) { // TODO: This might happen on server at least, might also happen here
             this->read_message(connection);
@@ -376,6 +396,9 @@ namespace SimpleWeb {
           if(length == 126) {
             // 2 next bytes is the size of content
             asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+              auto lock = connection->handler_runner->continue_lock();
+              if(!lock)
+                return;
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(2);
@@ -396,6 +419,9 @@ namespace SimpleWeb {
           else if(length == 127) {
             // 8 next bytes is the size of content
             asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(8), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+              auto lock = connection->handler_runner->continue_lock();
+              if(!lock)
+                return;
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(8);
@@ -425,6 +451,9 @@ namespace SimpleWeb {
 
     void read_message_content(const std::shared_ptr<Connection> &connection) {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+        auto lock = connection->handler_runner->continue_lock();
+        if(!lock)
+          return;
         if(!ec) {
           // If connection close
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
@@ -474,14 +503,20 @@ namespace SimpleWeb {
 
   protected:
     void connect() override {
+      std::unique_lock<std::mutex> lock(connection_mutex);
+      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(this->handler_runner, *io_service));
+      lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
-      resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
-        std::unique_lock<std::mutex> lock(connection_mutex);
-        auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service));
-        lock.unlock();
+      resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        auto lock = connection->handler_runner->continue_lock();
+        if(!lock)
+          return;
         if(!ec) {
           asio::async_connect(*connection->socket, it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            auto lock = connection->handler_runner->continue_lock();
+            if(!lock)
+              return;
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
               connection->socket->set_option(option);

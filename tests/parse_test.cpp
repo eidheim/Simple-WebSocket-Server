@@ -13,7 +13,7 @@ public:
   void accept() {}
 
   void parse_request_test() {
-    std::shared_ptr<Connection> connection(new Connection(0, *io_service));
+    std::shared_ptr<Connection> connection(new Connection(handler_runner, 0, *io_service));
 
     ostream ss(&connection->read_buffer);
     ss << "GET /test/ HTTP/1.1\r\n";
@@ -82,7 +82,7 @@ public:
   }
 
   void parse_response_header_test() {
-    auto connection = std::shared_ptr<Connection>(new Connection(*io_service));
+    auto connection = std::shared_ptr<Connection>(new Connection(handler_runner, *io_service));
     connection->message = std::shared_ptr<Message>(new Message());
 
     ostream stream(&connection->message->streambuf);

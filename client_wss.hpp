@@ -42,19 +42,28 @@ namespace SimpleWeb {
     asio::ssl::context context;
 
     void connect() override {
+      std::unique_lock<std::mutex> connection_lock(connection_mutex);
+      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(this->handler_runner, *io_service, context));
+      connection_lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
-      resolver->async_resolve(query, [this, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
-        std::unique_lock<std::mutex> lock(connection_mutex);
-        auto connection = this->connection = std::shared_ptr<Connection>(new Connection(*io_service, context));
-        lock.unlock();
+      resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        auto lock = connection->handler_runner->continue_lock();
+        if(!lock)
+          return;
         if(!ec) {
           asio::async_connect(connection->socket->lowest_layer(), it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            auto lock = connection->handler_runner->continue_lock();
+            if(!lock)
+              return;
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
               connection->socket->lowest_layer().set_option(option);
 
               connection->socket->async_handshake(asio::ssl::stream_base::client, [this, connection](const error_code &ec) {
+                auto lock = connection->handler_runner->continue_lock();
+                if(!lock)
+                  return;
                 if(!ec)
                   handshake(connection);
                 else if(on_error)
