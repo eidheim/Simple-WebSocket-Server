@@ -323,7 +323,8 @@ namespace SimpleWeb {
         if(!ec) {
           asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
             if(!ec) {
-              if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header)) {
+              if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
+                 connection->status_code != "101 Web Socket Protocol Handshake") {
                 if(this->on_error)
                   this->on_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
