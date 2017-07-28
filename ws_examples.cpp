@@ -40,6 +40,9 @@ int main() {
             "Error: " << ec << ", error message: " << ec.message() << endl;
       }
     });
+
+    // Alternatively, using a convenience function:
+    // connection->send(message_str, [](const SimpleWeb::error_code & /*ec*/) { /*handle error*/ });
   };
 
   echo.on_open = [](shared_ptr<WsServer::Connection> connection) {
