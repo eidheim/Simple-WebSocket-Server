@@ -74,9 +74,9 @@ int main() {
 
     connection->send(send_stream, [connection, send_stream](const SimpleWeb::error_code &ec) {
       if(!ec)
-        connection->send(send_stream); // Sent after the first send operation
+        connection->send(send_stream); // Sent after the first send operation is finished
     });
-    connection->send(send_stream); // Most likely queued and sent after the first send operation
+    connection->send(send_stream); // Most likely queued. Sent after the first send operation is finished.
   };
 
   // Example 3: Echo to all WebSocket Secure endpoints
