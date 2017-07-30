@@ -45,6 +45,7 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketServerBase {
   public:
+    /// The buffer is not consumed during send operations.
     class SendStream : public std::ostream {
       friend class SocketServerBase<socket_type>;
 
