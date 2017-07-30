@@ -53,8 +53,15 @@ namespace SimpleWeb {
 
     public:
       SendStream() noexcept : std::ostream(&streambuf) {}
+
+      /// Returns the size of the buffer
       size_t size() noexcept {
         return streambuf.size();
+      }
+
+      /// Clears the buffer
+      void consume() noexcept {
+        streambuf.consume(streambuf.size());
       }
     };
 
@@ -173,7 +180,7 @@ namespace SimpleWeb {
             if(!lock)
               return;
             if(!ec) {
-              asio::async_write(*self->socket, self->send_queue.begin()->message_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+              asio::async_write(*self->socket, self->send_queue.begin()->message_stream->streambuf.data(), self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
                 auto lock = self->handler_runner->continue_lock();
                 if(!lock)
                   return;

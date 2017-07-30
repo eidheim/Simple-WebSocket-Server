@@ -47,21 +47,14 @@ int main() {
 
   auto &echo_thrice = server.endpoint["^/echo_thrice/?$"];
   echo_thrice.on_message = [](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
-    auto message_str = message->string();
+    auto send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << message->string();
 
-    auto send_stream1 = make_shared<WsServer::SendStream>();
-    *send_stream1 << message_str;
-    connection->send(send_stream1, [connection, message_str](const SimpleWeb::error_code &ec) {
-      if(!ec) {
-        auto send_stream3 = make_shared<WsServer::SendStream>();
-        *send_stream3 << message_str;
-        connection->send(send_stream3); //Sent after send_stream1 is sent, and most likely after send_stream2
-      }
+    connection->send(send_stream, [connection, send_stream](const SimpleWeb::error_code &ec) {
+      if(!ec)
+        connection->send(send_stream);
     });
-    //Do not reuse send_stream1 here as it most likely is not sent yet
-    auto send_stream2 = make_shared<WsServer::SendStream>();
-    *send_stream2 << message_str;
-    connection->send(send_stream2); //Most likely queued, and sent after send_stream1
+    connection->send(send_stream);
   };
 
   thread server_thread([&server]() {

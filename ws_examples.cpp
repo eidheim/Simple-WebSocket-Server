@@ -62,30 +62,21 @@ int main() {
 
   // Example 2: Echo thrice
   // Demonstrating queuing of messages by sending a received message three times back to the client.
-  // send_stream2 is automatically queued by the library after the first send call,
-  // and send_stream3 is queued after the first send call through its callback
+  // Concurrent send operations are automatically queued by the library.
   // Test with the following JavaScript:
   //   var ws=new WebSocket("ws://localhost:8080/echo_thrice");
   //   ws.onmessage=function(evt){console.log(evt.data);};
   //   ws.send("test");
   auto &echo_thrice = server.endpoint["^/echo_thrice/?$"];
   echo_thrice.on_message = [](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
-    auto message_str = message->string();
+    auto send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << message->string();
 
-    auto send_stream1 = make_shared<WsServer::SendStream>();
-    *send_stream1 << message_str;
-    // connection->send is an asynchronous function
-    connection->send(send_stream1, [connection, message_str](const SimpleWeb::error_code &ec) {
-      if(!ec) {
-        auto send_stream3 = make_shared<WsServer::SendStream>();
-        *send_stream3 << message_str;
-        connection->send(send_stream3); // Sent after send_stream1 is sent, and most likely after send_stream2
-      }
+    connection->send(send_stream, [connection, send_stream](const SimpleWeb::error_code &ec) {
+      if(!ec)
+        connection->send(send_stream); // Sent after the first send operation
     });
-    // Do not reuse send_stream1 here as it most likely is not sent yet
-    auto send_stream2 = make_shared<WsServer::SendStream>();
-    *send_stream2 << message_str;
-    connection->send(send_stream2); // Most likely queued, and sent after send_stream1
+    connection->send(send_stream); // Most likely queued and sent after the first send operation
   };
 
   // Example 3: Echo to all WebSocket endpoints
@@ -96,15 +87,12 @@ int main() {
   //   ws.send("test");
   auto &echo_all = server.endpoint["^/echo_all/?$"];
   echo_all.on_message = [&server](shared_ptr<WsServer::Connection> /*connection*/, shared_ptr<WsServer::Message> message) {
-    auto message_str = message->string();
+    auto send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << message->string();
 
     // echo_all.get_connections() can also be used to solely receive connections on this endpoint
-    for(auto &a_connection : server.get_connections()) {
-      auto send_stream = make_shared<WsServer::SendStream>();
-      *send_stream << message_str;
-
+    for(auto &a_connection : server.get_connections())
       a_connection->send(send_stream);
-    }
   };
 
   thread server_thread([&server]() {
