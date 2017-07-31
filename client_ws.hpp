@@ -185,13 +185,6 @@ namespace SimpleWeb {
         });
       }
 
-      /// Convenience function for sending an std::string message
-      void send(const std::string &message, const std::function<void(const error_code &)> &callback = nullptr, unsigned char fin_rsv_opcode = 129) {
-        auto send_stream = std::make_shared<SendStream>();
-        send_stream->write(message.c_str(), message.size());
-        send(send_stream, callback, fin_rsv_opcode);
-      }
-
       void send_close(int status, const std::string &reason = "", const std::function<void(const error_code &)> &callback = nullptr) {
         // Send close only once (in case close is initiated by client)
         if(closed)
