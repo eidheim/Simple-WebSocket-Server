@@ -57,7 +57,7 @@ namespace SimpleWeb {
       SendStream() noexcept : std::ostream(&streambuf) {}
 
       /// Returns the size of the buffer
-      size_t size() noexcept {
+      size_t size() const noexcept {
         return streambuf.size();
       }
 
