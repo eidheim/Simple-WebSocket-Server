@@ -60,11 +60,6 @@ namespace SimpleWeb {
       size_t size() const noexcept {
         return streambuf.size();
       }
-
-      /// Clears the buffer
-      void consume() noexcept {
-        streambuf.consume(streambuf.size());
-      }
     };
 
     class Connection : public std::enable_shared_from_this<Connection> {

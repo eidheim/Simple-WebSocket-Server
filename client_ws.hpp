@@ -53,11 +53,6 @@ namespace SimpleWeb {
       size_t size() const noexcept {
         return streambuf.size();
       }
-
-      /// Clears the buffer
-      void consume() noexcept {
-        streambuf.consume(streambuf.size());
-      }
     };
 
     class Message;
