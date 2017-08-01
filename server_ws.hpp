@@ -280,6 +280,8 @@ namespace SimpleWeb {
       size_t size() noexcept {
         return length;
       }
+
+      /// Convenience function to return std::string. The stream buffer is consumed.
       std::string string() noexcept {
         try {
           std::stringstream ss;
