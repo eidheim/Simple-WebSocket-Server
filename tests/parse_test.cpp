@@ -83,7 +83,7 @@ public:
 
   void parse_response_header_test() {
     auto connection = std::shared_ptr<Connection>(new Connection(handler_runner, *io_service));
-    connection->message = std::shared_ptr<Message>(new Message());
+    connection->message = std::shared_ptr<InMessage>(new InMessage());
 
     ostream stream(&connection->message->streambuf);
     stream << "HTTP/1.1 200 OK\r\n";

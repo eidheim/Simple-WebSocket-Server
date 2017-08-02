@@ -38,16 +38,46 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketClientBase {
   public:
-    /// The buffer is consumed during send operations.
-    /// Do not alter while sending.
-    class SendStream : public std::iostream {
+    class OutMessage {
       friend class SocketClientBase<socket_type>;
 
-    private:
       asio::streambuf streambuf;
 
+      OutMessage() {}
+
     public:
-      SendStream() noexcept : std::iostream(&streambuf) {}
+      static std::shared_ptr<OutMessage> create() {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const std::string &message) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream << message;
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(std::istream &istream) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream << istream.rdbuf();
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const char *message, std::streamsize size) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream.write(message, size);
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const std::function<void(std::ostream &)> &writer) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        writer(ostream);
+        return out_message;
+      }
 
       /// Returns the size of the buffer
       size_t size() const noexcept {
@@ -55,7 +85,7 @@ namespace SimpleWeb {
       }
     };
 
-    class Message;
+    class InMessage;
 
     class Connection : public std::enable_shared_from_this<Connection> {
       friend class SocketClientBase<socket_type>;
@@ -77,7 +107,7 @@ namespace SimpleWeb {
       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
       std::mutex socket_close_mutex;
 
-      std::shared_ptr<Message> message;
+      std::shared_ptr<InMessage> message;
 
       void close() noexcept {
         error_code ec;
@@ -90,9 +120,9 @@ namespace SimpleWeb {
 
       class SendData {
       public:
-        SendData(std::shared_ptr<SendStream> send_stream, std::function<void(const error_code)> &&callback) noexcept
+        SendData(std::shared_ptr<OutMessage> send_stream, std::function<void(const error_code)> &&callback) noexcept
             : send_stream(std::move(send_stream)), callback(std::move(callback)) {}
-        std::shared_ptr<SendStream> send_stream;
+        std::shared_ptr<OutMessage> send_stream;
         std::function<void(const error_code)> callback;
       };
 
@@ -134,52 +164,50 @@ namespace SimpleWeb {
     public:
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-      void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
+      void send(const std::shared_ptr<OutMessage> &out_message, const std::function<void(const error_code &)> &callback = nullptr,
                 unsigned char fin_rsv_opcode = 129) {
-        // Create mask
-        std::vector<unsigned char> mask;
-        mask.resize(4);
-        std::uniform_int_distribution<unsigned short> dist(0, 255);
-        std::random_device rd;
-        for(int c = 0; c < 4; c++) {
-          mask[c] = static_cast<unsigned char>(dist(rd));
-        }
+        auto masked_out_message = OutMessage::create([&out_message, fin_rsv_opcode](std::ostream &ostream) {
+          // Create mask
+          std::vector<unsigned char> mask;
+          mask.resize(4);
+          std::uniform_int_distribution<unsigned short> dist(0, 255);
+          std::random_device rd;
+          for(int c = 0; c < 4; c++)
+            mask[c] = static_cast<unsigned char>(dist(rd));
 
-        auto send_stream = std::make_shared<SendStream>();
+          size_t length = out_message->size();
 
-        size_t length = message_stream->size();
+          ostream.put(fin_rsv_opcode);
+          // Masked (first length byte>=128)
+          if(length >= 126) {
+            int num_bytes;
+            if(length > 0xffff) {
+              num_bytes = 8;
+              ostream.put(static_cast<unsigned char>(127 + 128));
+            }
+            else {
+              num_bytes = 2;
+              ostream.put(static_cast<unsigned char>(126 + 128));
+            }
 
-        send_stream->put(fin_rsv_opcode);
-        // Masked (first length byte>=128)
-        if(length >= 126) {
-          int num_bytes;
-          if(length > 0xffff) {
-            num_bytes = 8;
-            send_stream->put(static_cast<unsigned char>(127 + 128));
+            for(int c = num_bytes - 1; c >= 0; c--) {
+              ostream.put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
+            }
           }
-          else {
-            num_bytes = 2;
-            send_stream->put(static_cast<unsigned char>(126 + 128));
-          }
+          else
+            ostream.put(static_cast<unsigned char>(length + 128));
 
-          for(int c = num_bytes - 1; c >= 0; c--) {
-            send_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-          }
-        }
-        else
-          send_stream->put(static_cast<unsigned char>(length + 128));
+          for(int c = 0; c < 4; c++)
+            ostream.put(mask[c]);
 
-        for(int c = 0; c < 4; c++) {
-          send_stream->put(mask[c]);
-        }
-
-        for(size_t c = 0; c < length; c++) {
-          send_stream->put(message_stream->get() ^ mask[c % 4]);
-        }
+          std::istream istream(&out_message->streambuf);
+          for(size_t c = 0; c < length; c++)
+            ostream.put(istream.get() ^ mask[c % 4]);
+        });
 
         auto self = this->shared_from_this();
-        strand.post([self, send_stream, callback]() {
-          self->send_queue.emplace_back(send_stream, callback);
+        strand.post([self, masked_out_message, callback]() {
+          self->send_queue.emplace_back(masked_out_message, callback);
           if(self->send_queue.size() == 1)
             self->send_from_queue();
         });
@@ -191,19 +219,18 @@ namespace SimpleWeb {
           return;
         closed = true;
 
-        auto send_stream = std::make_shared<SendStream>();
-
-        send_stream->put(status >> 8);
-        send_stream->put(status % 256);
-
-        *send_stream << reason;
+        auto out_message = OutMessage::create([status, &reason](std::ostream &ostream) {
+          ostream.put(status >> 8);
+          ostream.put(status % 256);
+          ostream << reason;
+        });
 
         // fin_rsv_opcode=136: message close
-        send(send_stream, callback, 136);
+        send(out_message, callback, 136);
       }
     };
 
-    class Message : public std::istream {
+    class InMessage : public std::istream {
       friend class SocketClientBase<socket_type>;
       friend class Connection;
 
@@ -226,13 +253,13 @@ namespace SimpleWeb {
       }
 
     private:
-      Message() noexcept : std::istream(&streambuf) {}
+      InMessage() noexcept : std::istream(&streambuf) {}
       size_t length;
       asio::streambuf streambuf;
     };
 
     std::function<void(std::shared_ptr<Connection>)> on_open;
-    std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
+    std::function<void(std::shared_ptr<Connection>, std::shared_ptr<InMessage>)> on_message;
     std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
     std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
 
@@ -333,7 +360,7 @@ namespace SimpleWeb {
       request << "Sec-WebSocket-Version: 13\r\n";
       request << "\r\n";
 
-      connection->message = std::shared_ptr<Message>(new Message());
+      connection->message = std::shared_ptr<InMessage>(new InMessage());
 
       asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
         auto lock = connection->handler_runner->continue_lock();
@@ -479,7 +506,7 @@ namespace SimpleWeb {
           // If ping
           else if((connection->message->fin_rsv_opcode & 0x0f) == 9) {
             // Send pong
-            auto empty_send_stream = std::make_shared<SendStream>();
+            auto empty_send_stream = OutMessage::create();
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
           }
           else if(this->on_message) {
@@ -487,7 +514,7 @@ namespace SimpleWeb {
           }
 
           // Next message
-          connection->message = std::shared_ptr<Message>(new Message());
+          connection->message = std::shared_ptr<InMessage>(new InMessage());
           this->read_message(connection);
         }
         else if(this->on_error)

@@ -19,7 +19,7 @@ int main() {
   //   wss.send("test");
   auto &echo = server.endpoint["^/echo/?$"];
 
-  echo.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
+  echo.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::InMessage> message) {
     // WssServer::Message::string() is a convenience function for:
     // stringstream data_ss;
     // data_ss << message->rdbuf();
@@ -30,7 +30,7 @@ int main() {
 
     cout << "Server: Sending message \"" << message_str << "\" to " << connection.get() << endl;
 
-    auto send_stream = make_shared<WssServer::SendStream>();
+    auto send_stream = make_shared<WssServer::OutMessage>();
     *send_stream << message_str;
     // connection->send is an asynchronous function
     connection->send(send_stream, [](const SimpleWeb::error_code &ec) {
@@ -68,8 +68,8 @@ int main() {
   //   wss.onmessage=function(evt){console.log(evt.data);};
   //   wss.send("test");
   auto &echo_thrice = server.endpoint["^/echo_thrice/?$"];
-  echo_thrice.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::Message> message) {
-    auto send_stream = make_shared<WssServer::SendStream>();
+  echo_thrice.on_message = [](shared_ptr<WssServer::Connection> connection, shared_ptr<WssServer::InMessage> message) {
+    auto send_stream = make_shared<WssServer::OutMessage>();
     *send_stream << message->string();
 
     connection->send(send_stream, [connection, send_stream](const SimpleWeb::error_code &ec) {
@@ -86,8 +86,8 @@ int main() {
   //   wss.onmessage=function(evt){console.log(evt.data);};
   //   wss.send("test");
   auto &echo_all = server.endpoint["^/echo_all/?$"];
-  echo_all.on_message = [&server](shared_ptr<WssServer::Connection> /*connection*/, shared_ptr<WssServer::Message> message) {
-    auto send_stream = make_shared<WssServer::SendStream>();
+  echo_all.on_message = [&server](shared_ptr<WssServer::Connection> /*connection*/, shared_ptr<WssServer::InMessage> message) {
+    auto send_stream = make_shared<WssServer::OutMessage>();
     *send_stream << message->string();
 
     // echo_all.get_connections() can also be used to solely receive connections on this endpoint
@@ -116,7 +116,7 @@ int main() {
   //   Server: Closed connection 0x7fcf21600380 with status code 1000
   //   Client: Closed connection with status code 1000
   WssClient client("localhost:8080/echo", false);
-  client.on_message = [](shared_ptr<WssClient::Connection> connection, shared_ptr<WssClient::Message> message) {
+  client.on_message = [](shared_ptr<WssClient::Connection> connection, shared_ptr<WssClient::InMessage> message) {
     auto message_str = message->string();
 
     cout << "Client: Message received: \"" << message_str << "\"" << endl;
@@ -131,7 +131,7 @@ int main() {
     string message = "Hello";
     cout << "Client: Sending message: \"" << message << "\"" << endl;
 
-    auto send_stream = make_shared<WssClient::SendStream>();
+    auto send_stream = make_shared<WssClient::OutMessage>();
     *send_stream << message;
     connection->send(send_stream);
   };

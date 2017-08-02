@@ -45,16 +45,46 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketServerBase {
   public:
-    /// The buffer is not consumed during send operations.
-    /// Do not alter while sending.
-    class SendStream : public std::ostream {
+    class OutMessage {
       friend class SocketServerBase<socket_type>;
 
-    private:
       asio::streambuf streambuf;
 
+      OutMessage() {}
+
     public:
-      SendStream() noexcept : std::ostream(&streambuf) {}
+      static std::shared_ptr<OutMessage> create() {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const std::string &message) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream << message;
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(std::istream &istream) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream << istream.rdbuf();
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const char *message, std::streamsize size) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        ostream.write(message, size);
+        return out_message;
+      }
+
+      static std::shared_ptr<OutMessage> create(const std::function<void(std::ostream &)> &writer) {
+        std::shared_ptr<OutMessage> out_message(new OutMessage());
+        std::ostream ostream(&out_message->streambuf);
+        writer(ostream);
+        return out_message;
+      }
 
       /// Returns the size of the buffer
       size_t size() const noexcept {
@@ -159,11 +189,11 @@ namespace SimpleWeb {
 
       class SendData {
       public:
-        SendData(std::shared_ptr<SendStream> header_stream, std::shared_ptr<SendStream> message_stream,
+        SendData(std::shared_ptr<OutMessage> header_stream, std::shared_ptr<OutMessage> out_message,
                  std::function<void(const error_code)> &&callback) noexcept
-            : header_stream(std::move(header_stream)), message_stream(std::move(message_stream)), callback(std::move(callback)) {}
-        std::shared_ptr<SendStream> header_stream;
-        std::shared_ptr<SendStream> message_stream;
+            : header_stream(std::move(header_stream)), out_message(std::move(out_message)), callback(std::move(callback)) {}
+        std::shared_ptr<OutMessage> header_stream;
+        std::shared_ptr<OutMessage> out_message;
         std::function<void(const error_code)> callback;
       };
 
@@ -177,7 +207,7 @@ namespace SimpleWeb {
             if(!lock)
               return;
             if(!ec) {
-              asio::async_write(*self->socket, self->send_queue.begin()->message_stream->streambuf.data(), self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+              asio::async_write(*self->socket, self->send_queue.begin()->out_message->streambuf.data(), self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
                 auto lock = self->handler_runner->continue_lock();
                 if(!lock)
                   return;
@@ -217,38 +247,38 @@ namespace SimpleWeb {
     public:
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-      void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
+      void send(const std::shared_ptr<OutMessage> &out_message, const std::function<void(const error_code &)> &callback = nullptr,
                 unsigned char fin_rsv_opcode = 129) {
         cancel_timeout();
         set_timeout();
 
-        auto header_stream = std::make_shared<SendStream>();
+        auto header_stream = OutMessage::create([&](std::ostream &ostream) {
+          size_t length = out_message->size();
 
-        size_t length = message_stream->size();
+          ostream.put(fin_rsv_opcode);
+          // Unmasked (first length byte<128)
+          if(length >= 126) {
+            int num_bytes;
+            if(length > 0xffff) {
+              num_bytes = 8;
+              ostream.put(127);
+            }
+            else {
+              num_bytes = 2;
+              ostream.put(126);
+            }
 
-        header_stream->put(fin_rsv_opcode);
-        // Unmasked (first length byte<128)
-        if(length >= 126) {
-          int num_bytes;
-          if(length > 0xffff) {
-            num_bytes = 8;
-            header_stream->put(127);
+            for(int c = num_bytes - 1; c >= 0; c--) {
+              ostream.put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
+            }
           }
-          else {
-            num_bytes = 2;
-            header_stream->put(126);
-          }
-
-          for(int c = num_bytes - 1; c >= 0; c--) {
-            header_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-          }
-        }
-        else
-          header_stream->put(static_cast<unsigned char>(length));
+          else
+            ostream.put(static_cast<unsigned char>(length));
+        });
 
         auto self = this->shared_from_this();
-        strand.post([self, header_stream, message_stream, callback]() {
-          self->send_queue.emplace_back(header_stream, message_stream, callback);
+        strand.post([self, header_stream, out_message, callback]() {
+          self->send_queue.emplace_back(header_stream, out_message, callback);
           if(self->send_queue.size() == 1)
             self->send_from_queue();
         });
@@ -260,19 +290,18 @@ namespace SimpleWeb {
           return;
         closed = true;
 
-        auto send_stream = std::make_shared<SendStream>();
-
-        send_stream->put(status >> 8);
-        send_stream->put(status % 256);
-
-        *send_stream << reason;
+        auto out_message = OutMessage::create([&](std::ostream &ostream) {
+          ostream.put(status >> 8);
+          ostream.put(status % 256);
+          ostream << reason;
+        });
 
         // fin_rsv_opcode=136: message close
-        send(send_stream, callback, 136);
+        send(out_message, callback, 136);
       }
     };
 
-    class Message : public std::istream {
+    class InMessage : public std::istream {
       friend class SocketServerBase<socket_type>;
 
     public:
@@ -294,7 +323,7 @@ namespace SimpleWeb {
       }
 
     private:
-      Message() noexcept : std::istream(&streambuf) {}
+      InMessage() noexcept : std::istream(&streambuf) {}
       size_t length;
       asio::streambuf streambuf;
     };
@@ -308,7 +337,7 @@ namespace SimpleWeb {
 
     public:
       std::function<void(std::shared_ptr<Connection>)> on_open;
-      std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
+      std::function<void(std::shared_ptr<Connection>, std::shared_ptr<InMessage>)> on_message;
       std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
       std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
 
@@ -611,7 +640,7 @@ namespace SimpleWeb {
           mask.resize(4);
           raw_message_data.read((char *)&mask[0], 4);
 
-          std::shared_ptr<Message> message(new Message());
+          std::shared_ptr<InMessage> message(new InMessage());
           message->length = length;
           message->fin_rsv_opcode = fin_rsv_opcode;
 
@@ -638,8 +667,8 @@ namespace SimpleWeb {
             // If ping
             if((fin_rsv_opcode & 0x0f) == 9) {
               // Send pong
-              auto empty_send_stream = std::make_shared<SendStream>();
-              connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
+              auto empty_out_message = OutMessage::create();
+              connection->send(empty_out_message, nullptr, fin_rsv_opcode + 1);
             }
             else if(endpoint.on_message) {
               connection->cancel_timeout();
