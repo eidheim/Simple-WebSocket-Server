@@ -20,10 +20,6 @@ int main() {
   auto &echo = server.endpoint["^/echo/?$"];
 
   echo.on_message = [](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
-    // WsServer::Message::string() is a convenience function for:
-    // stringstream data_ss;
-    // data_ss << message->rdbuf();
-    // auto message_str = data_ss.str();
     auto message_str = message->string();
 
     cout << "Server: Message received: \"" << message_str << "\" from " << connection.get() << endl;

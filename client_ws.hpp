@@ -43,7 +43,6 @@ namespace SimpleWeb {
     class SendStream : public std::iostream {
       friend class SocketClientBase<socket_type>;
 
-    private:
       asio::streambuf streambuf;
 
     public:
