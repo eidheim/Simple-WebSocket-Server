@@ -59,7 +59,7 @@ namespace SimpleWeb {
         return base64;
       }
 
-      static std::string decode(const std::string &base64) noexcept {
+      static std::string decode(std::string &base64) noexcept {
         std::string ascii;
 
         // Resize ascii, however, the size is a up to two bytes too large.
