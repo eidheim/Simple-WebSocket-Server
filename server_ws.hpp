@@ -225,10 +225,10 @@ namespace SimpleWeb {
 
         size_t length = message_stream->size();
 
-        header_stream->put(fin_rsv_opcode);
+        header_stream->put(static_cast<char>(fin_rsv_opcode));
         // Unmasked (first length byte<128)
         if(length >= 126) {
-          int num_bytes;
+          size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
             header_stream->put(127);
@@ -238,12 +238,11 @@ namespace SimpleWeb {
             header_stream->put(126);
           }
 
-          for(int c = num_bytes - 1; c >= 0; c--) {
+          for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
             header_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-          }
         }
         else
-          header_stream->put(static_cast<unsigned char>(length));
+          header_stream->put(static_cast<char>(length));
 
         auto self = this->shared_from_this();
         strand.post([self, header_stream, message_stream, callback]() {
@@ -555,9 +554,9 @@ namespace SimpleWeb {
                 stream.read((char *)&length_bytes[0], 2);
 
                 size_t length = 0;
-                int num_bytes = 2;
-                for(int c = 0; c < num_bytes; c++)
-                  length += length_bytes[c] << (8 * (num_bytes - 1 - c));
+                size_t num_bytes = 2;
+                for(size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 read_message_content(connection, length, endpoint, fin_rsv_opcode);
               }
@@ -579,9 +578,9 @@ namespace SimpleWeb {
                 stream.read((char *)&length_bytes[0], 8);
 
                 size_t length = 0;
-                int num_bytes = 8;
-                for(int c = 0; c < num_bytes; c++)
-                  length += length_bytes[c] << (8 * (num_bytes - 1 - c));
+                size_t num_bytes = 8;
+                for(size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 read_message_content(connection, length, endpoint, fin_rsv_opcode);
               }

@@ -140,41 +140,37 @@ namespace SimpleWeb {
         mask.resize(4);
         std::uniform_int_distribution<unsigned short> dist(0, 255);
         std::random_device rd;
-        for(int c = 0; c < 4; c++) {
+        for(size_t c = 0; c < 4; c++)
           mask[c] = static_cast<unsigned char>(dist(rd));
-        }
 
         auto send_stream = std::make_shared<SendStream>();
 
         size_t length = message_stream->size();
 
-        send_stream->put(fin_rsv_opcode);
+        send_stream->put(static_cast<char>(fin_rsv_opcode));
         // Masked (first length byte>=128)
         if(length >= 126) {
-          int num_bytes;
+          size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
-            send_stream->put(static_cast<unsigned char>(127 + 128));
+            send_stream->put(static_cast<char>(127 + 128));
           }
           else {
             num_bytes = 2;
-            send_stream->put(static_cast<unsigned char>(126 + 128));
+            send_stream->put(static_cast<char>(126 + 128));
           }
 
-          for(int c = num_bytes - 1; c >= 0; c--) {
+          for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
             send_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
-          }
         }
         else
-          send_stream->put(static_cast<unsigned char>(length + 128));
+          send_stream->put(static_cast<char>(length + 128));
 
-        for(int c = 0; c < 4; c++) {
-          send_stream->put(mask[c]);
-        }
+        for(size_t c = 0; c < 4; c++)
+          send_stream->put(static_cast<char>(mask[c]));
 
-        for(size_t c = 0; c < length; c++) {
+        for(size_t c = 0; c < length; c++)
           send_stream->put(message_stream->get() ^ mask[c % 4]);
-        }
 
         auto self = this->shared_from_this();
         strand.post([self, send_stream, callback]() {
@@ -324,8 +320,8 @@ namespace SimpleWeb {
       nonce.resize(16);
       std::uniform_int_distribution<unsigned short> dist(0, 255);
       std::random_device rd;
-      for(int c = 0; c < 16; c++)
-        nonce[c] = static_cast<unsigned char>(dist(rd));
+      for(size_t c = 0; c < 16; c++)
+        nonce[c] = static_cast<char>(dist(rd));
 
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
@@ -382,7 +378,7 @@ namespace SimpleWeb {
           }
           std::vector<unsigned char> first_bytes;
           first_bytes.resize(2);
-          connection->message->read((char *)&first_bytes[0], 2);
+          connection->message->read(reinterpret_cast<char *>(&first_bytes[0]), 2);
 
           connection->message->fin_rsv_opcode = first_bytes[0];
 
@@ -406,12 +402,12 @@ namespace SimpleWeb {
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(2);
-                connection->message->read((char *)&length_bytes[0], 2);
+                connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
 
                 size_t length = 0;
-                int num_bytes = 2;
-                for(int c = 0; c < num_bytes; c++)
-                  length += length_bytes[c] << (8 * (num_bytes - 1 - c));
+                size_t num_bytes = 2;
+                for(size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
                 this->read_message_content(connection);
@@ -429,12 +425,12 @@ namespace SimpleWeb {
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(8);
-                connection->message->read((char *)&length_bytes[0], 8);
+                connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
 
                 size_t length = 0;
-                int num_bytes = 8;
-                for(int c = 0; c < num_bytes; c++)
-                  length += length_bytes[c] << (8 * (num_bytes - 1 - c));
+                size_t num_bytes = 8;
+                for(size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
                 this->read_message_content(connection);
