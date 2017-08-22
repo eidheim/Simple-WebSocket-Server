@@ -60,6 +60,7 @@ namespace SimpleWeb {
               asio::ip::tcp::no_delay option(true);
               connection->socket->lowest_layer().set_option(option);
 
+              SSL_set_tlsext_host_name(connection->socket->native_handle(), this->host.c_str());
               connection->socket->async_handshake(asio::ssl::stream_base::client, [this, connection](const error_code &ec) {
                 auto lock = connection->handler_runner->continue_lock();
                 if(!lock)
