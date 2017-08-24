@@ -68,8 +68,8 @@ namespace SimpleWeb {
 
     private:
       template <typename... Args>
-      Connection(std::shared_ptr<ScopeRunner> handler_runner, Args &&... args) noexcept
-          : handler_runner(std::move(handler_runner)), socket(new socket_type(std::forward<Args>(args)...)), strand(socket->get_io_service()), closed(false) {}
+      Connection(std::shared_ptr<ScopeRunner> handler_runner, long timeout_idle, Args &&... args) noexcept
+          : handler_runner(std::move(handler_runner)), socket(new socket_type(std::forward<Args>(args)...)), timeout_idle(timeout_idle), strand(socket->get_io_service()), closed(false) {}
 
       std::shared_ptr<ScopeRunner> handler_runner;
 
@@ -78,11 +78,50 @@ namespace SimpleWeb {
 
       std::shared_ptr<Message> message;
 
+      long timeout_idle;
+      std::unique_ptr<asio::deadline_timer> timer;
+      std::mutex timer_mutex;
+
       void close() noexcept {
         error_code ec;
         std::unique_lock<std::mutex> lock(socket_close_mutex); // The following operations seems to be needed to run sequentially
         socket->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         socket->lowest_layer().close(ec);
+      }
+
+      void set_timeout(long seconds = -1) noexcept {
+        bool use_timeout_idle = false;
+        if(seconds == -1) {
+          use_timeout_idle = true;
+          seconds = timeout_idle;
+        }
+
+        std::unique_lock<std::mutex> lock(timer_mutex);
+
+        if(seconds == 0) {
+          timer = nullptr;
+          return;
+        }
+
+        timer = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(socket->get_io_service()));
+        timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
+        auto self = this->shared_from_this();
+        timer->async_wait([self, use_timeout_idle](const error_code &ec) {
+          if(!ec) {
+            if(use_timeout_idle)
+              self->send_close(1000, "idle timeout"); // 1000=normal closure
+            else
+              self->close();
+          }
+        });
+      }
+
+      void cancel_timeout() noexcept {
+        std::unique_lock<std::mutex> lock(timer_mutex);
+        if(timer) {
+          error_code ec;
+          timer->cancel(ec);
+        }
       }
 
       asio::strand strand;
@@ -135,6 +174,9 @@ namespace SimpleWeb {
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
       void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
                 unsigned char fin_rsv_opcode = 129) {
+        cancel_timeout();
+        set_timeout();
+
         // Create mask
         std::vector<unsigned char> mask;
         mask.resize(4);
@@ -225,6 +267,21 @@ namespace SimpleWeb {
       size_t length;
       asio::streambuf streambuf;
     };
+
+    class Config {
+      friend class SocketClientBase<socket_type>;
+
+    private:
+      Config() noexcept {}
+
+    public:
+      /// Timeout on request handling. Defaults to no timeout.
+      long timeout_request = 0;
+      /// Idle timeout. Defaults to no timeout.
+      long timeout_idle = 0;
+    };
+    /// Set before calling start().
+    Config config;
 
     std::function<void(std::shared_ptr<Connection>)> on_open;
     std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
@@ -330,39 +387,41 @@ namespace SimpleWeb {
 
       connection->message = std::shared_ptr<Message>(new Message());
 
+      connection->set_timeout(config.timeout_request);
       asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+        connection->cancel_timeout();
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
+          connection->set_timeout(this->config.timeout_request);
           asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+            connection->cancel_timeout();
             auto lock = connection->handler_runner->continue_lock();
             if(!lock)
               return;
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
                  connection->status_code != "101 Web Socket Protocol Handshake") {
-                if(this->on_error)
-                  this->on_error(connection, make_error_code::make_error_code(errc::protocol_error));
+                this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
               auto header_it = connection->header.find("Sec-WebSocket-Accept");
               static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
               if(header_it != connection->header.end() &&
                  Crypto::Base64::decode(header_it->second) == Crypto::sha1(*nonce_base64 + ws_magic_string)) {
-                if(this->on_open)
-                  this->on_open(connection);
+                this->connection_open(connection);
                 read_message(connection);
               }
-              else if(this->on_error)
-                this->on_error(connection, make_error_code::make_error_code(errc::protocol_error));
+              else
+                this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
             }
-            else if(this->on_error)
-              this->on_error(connection, ec);
+            else
+              this->connection_error(connection, ec);
           });
         }
-        else if(this->on_error)
-          this->on_error(connection, ec);
+        else
+          this->connection_error(connection, ec);
       });
     }
 
@@ -386,8 +445,7 @@ namespace SimpleWeb {
           if(first_bytes[1] >= 128) {
             const std::string reason("message from server masked");
             connection->send_close(1002, reason, [this](const error_code & /*ec*/) {});
-            if(this->on_close)
-              this->on_close(connection, 1002, reason);
+            this->connection_close(connection, 1002, reason);
             return;
           }
 
@@ -412,8 +470,8 @@ namespace SimpleWeb {
                 connection->message->length = length;
                 this->read_message_content(connection);
               }
-              else if(this->on_error)
-                this->on_error(connection, ec);
+              else
+                this->connection_error(connection, ec);
             });
           }
           else if(length == 127) {
@@ -435,8 +493,8 @@ namespace SimpleWeb {
                 connection->message->length = length;
                 this->read_message_content(connection);
               }
-              else if(this->on_error)
-                this->on_error(connection, ec);
+              else
+                this->connection_error(connection, ec);
             });
           }
           else {
@@ -444,8 +502,8 @@ namespace SimpleWeb {
             this->read_message_content(connection);
           }
         }
-        else if(this->on_error)
-          this->on_error(connection, ec);
+        else
+          this->connection_error(connection, ec);
       });
     }
 
@@ -467,8 +525,7 @@ namespace SimpleWeb {
             auto reason = connection->message->string();
             auto kept_connection = connection;
             connection->send_close(status, reason, [this, kept_connection](const error_code & /*ec*/) {});
-            if(this->on_close)
-              this->on_close(connection, status, reason);
+            this->connection_close(connection, status, reason);
             return;
           }
           // If ping
@@ -478,6 +535,8 @@ namespace SimpleWeb {
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
           }
           else if(this->on_message) {
+            connection->cancel_timeout();
+            connection->set_timeout();
             this->on_message(connection, connection->message);
           }
 
@@ -485,9 +544,33 @@ namespace SimpleWeb {
           connection->message = std::shared_ptr<Message>(new Message());
           this->read_message(connection);
         }
-        else if(this->on_error)
-          this->on_error(connection, ec);
+        else
+          this->connection_error(connection, ec);
       });
+    }
+
+    void connection_open(const std::shared_ptr<Connection> &connection) const {
+      connection->cancel_timeout();
+      connection->set_timeout();
+
+      if(on_open)
+        on_open(connection);
+    }
+
+    void connection_close(const std::shared_ptr<Connection> &connection, int status, const std::string &reason) const {
+      connection->cancel_timeout();
+      connection->set_timeout();
+
+      if(on_close)
+        on_close(connection, status, reason);
+    }
+
+    void connection_error(const std::shared_ptr<Connection> &connection, const error_code &ec) const {
+      connection->cancel_timeout();
+      connection->set_timeout();
+
+      if(on_error)
+        on_error(connection, ec);
     }
   };
 
@@ -504,16 +587,20 @@ namespace SimpleWeb {
   protected:
     void connect() override {
       std::unique_lock<std::mutex> lock(connection_mutex);
-      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(this->handler_runner, *io_service));
+      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
       lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
+      connection->set_timeout(config.timeout_request);
       resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        connection->cancel_timeout();
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
+          connection->set_timeout(this->config.timeout_request);
           asio::async_connect(*connection->socket, it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            connection->cancel_timeout();
             auto lock = connection->handler_runner->continue_lock();
             if(!lock)
               return;
@@ -523,12 +610,12 @@ namespace SimpleWeb {
 
               this->handshake(connection);
             }
-            else if(this->on_error)
-              this->on_error(connection, ec);
+            else
+              this->connection_error(connection, ec);
           });
         }
-        else if(this->on_error)
-          this->on_error(connection, ec);
+        else
+          this->connection_error(connection, ec);
       });
     }
   };

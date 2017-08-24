@@ -43,16 +43,20 @@ namespace SimpleWeb {
 
     void connect() override {
       std::unique_lock<std::mutex> connection_lock(connection_mutex);
-      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(this->handler_runner, *io_service, context));
+      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service, context));
       connection_lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
+      connection->set_timeout(config.timeout_request);
       resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        connection->cancel_timeout();
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
+          connection->set_timeout(this->config.timeout_request);
           asio::async_connect(connection->socket->lowest_layer(), it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            connection->cancel_timeout();
             auto lock = connection->handler_runner->continue_lock();
             if(!lock)
               return;
@@ -61,22 +65,25 @@ namespace SimpleWeb {
               connection->socket->lowest_layer().set_option(option);
 
               SSL_set_tlsext_host_name(connection->socket->native_handle(), this->host.c_str());
+
+              connection->set_timeout(this->config.timeout_request);
               connection->socket->async_handshake(asio::ssl::stream_base::client, [this, connection](const error_code &ec) {
+                connection->cancel_timeout();
                 auto lock = connection->handler_runner->continue_lock();
                 if(!lock)
                   return;
                 if(!ec)
                   handshake(connection);
-                else if(on_error)
-                  on_error(connection, ec);
+                else
+                  this->connection_error(connection, ec);
               });
             }
-            else if(on_error)
-              on_error(connection, ec);
+            else
+              this->connection_error(connection, ec);
           });
         }
-        else if(on_error)
-          on_error(connection, ec);
+        else
+          this->connection_error(connection, ec);
       });
     }
   };
