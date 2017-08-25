@@ -444,7 +444,7 @@ namespace SimpleWeb {
           // Close connection if masked message from server (protocol error)
           if(first_bytes[1] >= 128) {
             const std::string reason("message from server masked");
-            connection->send_close(1002, reason, [this](const error_code & /*ec*/) {});
+            connection->send_close(1002, reason);
             this->connection_close(connection, 1002, reason);
             return;
           }
@@ -523,8 +523,7 @@ namespace SimpleWeb {
             }
 
             auto reason = connection->message->string();
-            auto kept_connection = connection;
-            connection->send_close(status, reason, [this, kept_connection](const error_code & /*ec*/) {});
+            connection->send_close(status, reason);
             this->connection_close(connection, status, reason);
             return;
           }
@@ -558,16 +557,14 @@ namespace SimpleWeb {
     }
 
     void connection_close(const std::shared_ptr<Connection> &connection, int status, const std::string &reason) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
 
       if(on_close)
         on_close(connection, status, reason);
     }
 
     void connection_error(const std::shared_ptr<Connection> &connection, const error_code &ec) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
 
       if(on_error)
         on_error(connection, ec);

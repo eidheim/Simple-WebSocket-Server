@@ -533,7 +533,7 @@ namespace SimpleWeb {
           // Close connection if unmasked message from client (protocol error)
           if(first_bytes[1] < 128) {
             const std::string reason("message from client not masked");
-            connection->send_close(1002, reason, [](const error_code & /*ec*/) {});
+            connection->send_close(1002, reason);
             connection_close(connection, endpoint, 1002, reason);
             return;
           }
@@ -628,7 +628,7 @@ namespace SimpleWeb {
             }
 
             auto reason = message->string();
-            connection->send_close(status, reason, [](const error_code & /*ec*/) {});
+            connection->send_close(status, reason);
             connection_close(connection, endpoint, status, reason);
             return;
           }
@@ -668,8 +668,7 @@ namespace SimpleWeb {
     }
 
     void connection_close(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, int status, const std::string &reason) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
 
       {
         std::unique_lock<std::mutex> lock(endpoint.connections_mutex);
@@ -681,8 +680,7 @@ namespace SimpleWeb {
     }
 
     void connection_error(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, const error_code &ec) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
 
       {
         std::unique_lock<std::mutex> lock(endpoint.connections_mutex);
