@@ -116,13 +116,15 @@ namespace SimpleWeb {
 
         timer = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(socket->get_io_service()));
         timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
-        auto self = this->shared_from_this();
-        timer->async_wait([self, use_timeout_idle](const error_code &ec) {
+        std::weak_ptr<Connection> connection_weak(this->shared_from_this()); // To avoid keeping Connection instance alive longer than needed
+        timer->async_wait([connection_weak, use_timeout_idle](const error_code &ec) {
           if(!ec) {
-            if(use_timeout_idle)
-              self->send_close(1000, "idle timeout"); // 1000=normal closure
-            else
-              self->close();
+            if(auto connection = connection_weak.lock()) {
+              if(use_timeout_idle)
+                connection->send_close(1000, "idle timeout"); // 1000=normal closure
+              else
+                connection->close();
+            }
           }
         });
       }
@@ -668,7 +670,8 @@ namespace SimpleWeb {
     }
 
     void connection_close(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, int status, const std::string &reason) const {
-      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
+      connection->cancel_timeout();
+      connection->set_timeout();
 
       {
         std::unique_lock<std::mutex> lock(endpoint.connections_mutex);
@@ -680,7 +683,8 @@ namespace SimpleWeb {
     }
 
     void connection_error(const std::shared_ptr<Connection> &connection, Endpoint &endpoint, const error_code &ec) const {
-      connection->cancel_timeout(); // Delete timeout handle that might contain copy of Connection shared_ptr
+      connection->cancel_timeout();
+      connection->set_timeout();
 
       {
         std::unique_lock<std::mutex> lock(endpoint.connections_mutex);
