@@ -16,6 +16,7 @@
 
 #ifdef USE_STANDALONE_ASIO
 #include <asio.hpp>
+#include <asio/steady_timer.hpp>
 namespace SimpleWeb {
   using error_code = std::error_code;
   using errc = std::errc;
@@ -23,6 +24,7 @@ namespace SimpleWeb {
 } // namespace SimpleWeb
 #else
 #include <boost/asio.hpp>
+#include <boost/asio/steady_timer.hpp>
 namespace SimpleWeb {
   namespace asio = boost::asio;
   using error_code = boost::system::error_code;
@@ -79,7 +81,7 @@ namespace SimpleWeb {
       std::shared_ptr<Message> message;
 
       long timeout_idle;
-      std::unique_ptr<asio::deadline_timer> timer;
+      std::unique_ptr<asio::steady_timer> timer;
       std::mutex timer_mutex;
 
       void close() noexcept {
@@ -103,8 +105,8 @@ namespace SimpleWeb {
           return;
         }
 
-        timer = std::unique_ptr<asio::deadline_timer>(new asio::deadline_timer(socket->get_io_service()));
-        timer->expires_from_now(boost::posix_time::seconds(static_cast<long>(seconds)));
+        timer = std::unique_ptr<asio::steady_timer>(new asio::steady_timer(socket->get_io_service()));
+        timer->expires_from_now(std::chrono::seconds(seconds));
         std::weak_ptr<Connection> connection_weak(this->shared_from_this()); // To avoid keeping Connection instance alive longer than needed
         timer->async_wait([connection_weak, use_timeout_idle](const error_code &ec) {
           if(!ec) {
