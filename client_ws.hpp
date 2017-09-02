@@ -128,7 +128,7 @@ namespace SimpleWeb {
         }
       }
 
-      asio::strand strand;
+      asio::io_service::strand strand;
 
       class SendData {
       public:
