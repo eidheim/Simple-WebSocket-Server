@@ -701,7 +701,7 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketServer : public SocketServerBase<socket_type> {};
 
-  typedef asio::ip::tcp::socket WS;
+  using WS = asio::ip::tcp::socket;
 
   template <>
   class SocketServer<WS> : public SocketServerBase<WS> {

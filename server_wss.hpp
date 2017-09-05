@@ -13,7 +13,7 @@
 
 
 namespace SimpleWeb {
-  typedef asio::ssl::stream<asio::ip::tcp::socket> WSS;
+  using WSS = asio::ssl::stream<asio::ip::tcp::socket>;
 
   template <>
   class SocketServer<WSS> : public SocketServerBase<WSS> {

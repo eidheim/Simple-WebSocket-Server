@@ -3,8 +3,8 @@
 
 using namespace std;
 
-typedef SimpleWeb::SocketServer<SimpleWeb::WS> WsServer;
-typedef SimpleWeb::SocketClient<SimpleWeb::WS> WsClient;
+using WsServer = SimpleWeb::SocketServer<SimpleWeb::WS>;
+using WsClient = SimpleWeb::SocketClient<SimpleWeb::WS>;
 
 int main() {
   // WebSocket (WS)-server at port 8080 using 1 thread
