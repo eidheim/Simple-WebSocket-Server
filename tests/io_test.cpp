@@ -232,6 +232,4 @@ int main() {
 
   server.stop();
   server_thread.join();
-
-  return 0;
 }
