@@ -216,7 +216,7 @@ namespace SimpleWeb {
           send_stream->put(static_cast<char>(mask[c]));
 
         for(size_t c = 0; c < length; c++)
-          send_stream->put(message_stream->get() ^ mask[c % 4]);
+          send_stream->put(static_cast<char>(message_stream->get() ^ mask[c % 4]));
 
         auto self = this->shared_from_this();
         strand.post([self, send_stream, callback]() {
@@ -234,7 +234,7 @@ namespace SimpleWeb {
 
         auto send_stream = std::make_shared<SendStream>();
 
-        send_stream->put(status >> 8);
+        send_stream->put(static_cast<char>(status >> 8));
         send_stream->put(status % 256);
 
         *send_stream << reason;
@@ -310,8 +310,8 @@ namespace SimpleWeb {
     void stop() noexcept {
       {
         std::unique_lock<std::mutex> lock(connection_mutex);
-        if(connection)
-          connection->close();
+        if(_connection)
+          _connection->close();
       }
 
       if(internal_io_service)
@@ -333,7 +333,7 @@ namespace SimpleWeb {
     unsigned short port;
     std::string path;
 
-    std::shared_ptr<Connection> connection;
+    std::shared_ptr<Connection> _connection;
     std::mutex connection_mutex;
 
     std::shared_ptr<ScopeRunner> handler_runner;
@@ -521,8 +521,8 @@ namespace SimpleWeb {
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
             int status = 0;
             if(connection->message->length >= 2) {
-              unsigned char byte1 = connection->message->get();
-              unsigned char byte2 = connection->message->get();
+              unsigned char byte1 = static_cast<unsigned char>(connection->message->get());
+              unsigned char byte2 = static_cast<unsigned char>(connection->message->get());
               status = (byte1 << 8) + byte2;
             }
 
@@ -590,7 +590,7 @@ namespace SimpleWeb {
   protected:
     void connect() override {
       std::unique_lock<std::mutex> lock(connection_mutex);
-      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
+      auto connection = this->_connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
       lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
