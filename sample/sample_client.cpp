@@ -29,7 +29,7 @@ int main(int, char**)
             client = std::make_shared<WsClient>("localhost:8081/some/http/resource");
 
 
-            client->SetProtocol("sky-controller");  // optional
+            client->SetProtocol("some-protocol");  // optional
 
             client->on_open = [&](shared_ptr<WsClient::Connection> connection)
             {
