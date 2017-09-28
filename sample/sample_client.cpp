@@ -26,7 +26,8 @@ int main(int, char**)
 
         if (line == "s")
         {
-            client = std::make_shared<WsClient>("172.20.110.36:9500");
+            client = std::make_shared<WsClient>("localhost:8081/some/http/resource");
+
 
             client->SetProtocol("sky-controller");  // optional
 

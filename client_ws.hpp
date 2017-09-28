@@ -410,7 +410,7 @@ namespace SimpleWeb {
               return;
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
-                 connection->status_code != "101 Web Socket Protocol Handshake") {
+                 connection->status_code.substr(0, 3) != "101") {
                 this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
