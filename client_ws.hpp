@@ -199,11 +199,11 @@ namespace SimpleWeb {
           size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
-            send_stream->put(static_cast<unsigned char>(/*127 + 128*/ 0xFEu));
+            send_stream->put(static_cast<char>(/*127 + 128*/ 0xFEu));
           }
           else {
             num_bytes = 2;
-            send_stream->put(static_cast<unsigned char>(/*126 + 128*/ 0xFEu));
+            send_stream->put(static_cast<char>(/*126 + 128*/ 0xFEu));
           }
 
           for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
