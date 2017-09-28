@@ -1,24 +1,24 @@
 Simple-WebSocket-Sample
 =======================
 
-This sample project contains two executables which allow the user to control the connections and message flow for Simple-WebSocket-Server.  It might be useful for testing interoperability with other websockets implementations.
+This project contains two executables which allow the user to control the connections and message flow for Simple-WebSocket-Server.  It might be useful for testing interoperability with other websockets implementations.
 
 The following actions are supported.
 
-### sample_server
+### sample_server controls
 
- s :  Start server
- t :  sTop server
- m :  send Message to all clients
- q :  Quit
+    s :  Start server
+    t :  sTop server
+    m :  send Message to all clients
+    q :  Quit
 
-### sample_client
+### sample_client controls
 
- s :  Set up connection
- l :  cLose connection
- c :  stop Client
- m :  send Message
- q :  Quit
+    s :  Set up connection
+    l :  cLose connection
+    c :  stop Client
+    m :  send Message
+    q :  Quit
 
 ## Usage
 
