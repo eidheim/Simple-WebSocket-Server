@@ -47,43 +47,43 @@ namespace SimpleWeb {
       connection_lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
-      connection->set_timeout(config.timeout_request);
-      resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
-        connection->cancel_timeout();
-        auto lock = connection->handler_runner->continue_lock();
+      new_connection->set_timeout(config.timeout_request);
+      resolver->async_resolve(query, [this, new_connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        new_connection->cancel_timeout();
+        auto lock = new_connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
-          connection->set_timeout(this->config.timeout_request);
-          asio::async_connect(connection->socket->lowest_layer(), it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
-            connection->cancel_timeout();
-            auto lock = connection->handler_runner->continue_lock();
+          new_connection->set_timeout(this->config.timeout_request);
+          asio::async_connect(new_connection->socket->lowest_layer(), it, [this, new_connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            new_connection->cancel_timeout();
+            auto lock = new_connection->handler_runner->continue_lock();
             if(!lock)
               return;
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
-              connection->socket->lowest_layer().set_option(option);
+              new_connection->socket->lowest_layer().set_option(option);
 
-              SSL_set_tlsext_host_name(connection->socket->native_handle(), this->host.c_str());
+              SSL_set_tlsext_host_name(new_connection->socket->native_handle(), this->host.c_str());
 
-              connection->set_timeout(this->config.timeout_request);
-              connection->socket->async_handshake(asio::ssl::stream_base::client, [this, connection](const error_code &ec) {
-                connection->cancel_timeout();
-                auto lock = connection->handler_runner->continue_lock();
+              new_connection->set_timeout(this->config.timeout_request);
+              new_connection->socket->async_handshake(asio::ssl::stream_base::client, [this, new_connection](const error_code &ec) {
+                new_connection->cancel_timeout();
+                auto lock = new_connection->handler_runner->continue_lock();
                 if(!lock)
                   return;
                 if(!ec)
-                  handshake(connection);
+                  handshake(new_connection);
                 else
-                  this->connection_error(connection, ec);
+                  this->connection_error(new_connection, ec);
               });
             }
             else
-              this->connection_error(connection, ec);
+              this->connection_error(new_connection, ec);
           });
         }
         else
-          this->connection_error(connection, ec);
+          this->connection_error(new_connection, ec);
       });
     }
   };
