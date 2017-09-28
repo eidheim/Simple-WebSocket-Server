@@ -199,11 +199,11 @@ namespace SimpleWeb {
           size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
-            send_stream->put(static_cast<char>(127 + 128));
+            send_stream->put(static_cast<char>(/*127 + 128*/ 0xFEu));
           }
           else {
             num_bytes = 2;
-            send_stream->put(static_cast<char>(126 + 128));
+            send_stream->put(static_cast<char>(/*126 + 128*/ 0xFEu));
           }
 
           for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
@@ -216,7 +216,7 @@ namespace SimpleWeb {
           send_stream->put(static_cast<char>(mask[c]));
 
         for(size_t c = 0; c < length; c++)
-          send_stream->put(message_stream->get() ^ mask[c % 4]);
+          send_stream->put(static_cast<char>(message_stream->get() ^ mask[c % 4]));
 
         auto self = this->shared_from_this();
         strand.post([self, send_stream, callback]() {
@@ -234,7 +234,7 @@ namespace SimpleWeb {
 
         auto send_stream = std::make_shared<SendStream>();
 
-        send_stream->put(status >> 8);
+        send_stream->put(static_cast<char>(status >> 8));
         send_stream->put(status % 256);
 
         *send_stream << reason;
@@ -310,8 +310,8 @@ namespace SimpleWeb {
     void stop() noexcept {
       {
         std::unique_lock<std::mutex> lock(connection_mutex);
-        if(connection)
-          connection->close();
+        if(_connection)
+          _connection->close();
       }
 
       if(internal_io_service)
@@ -333,7 +333,9 @@ namespace SimpleWeb {
     unsigned short port;
     std::string path;
 
-    std::shared_ptr<Connection> connection;
+    std::string protocol = "";
+
+    std::shared_ptr<Connection> _connection;
     std::mutex connection_mutex;
 
     std::shared_ptr<ScopeRunner> handler_runner;
@@ -387,6 +389,8 @@ namespace SimpleWeb {
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
       request << "Sec-WebSocket-Version: 13\r\n";
+      if (protocol != "")
+          request << "Sec-WebSocket-Protocol: " << protocol << "\r\n";
       request << "\r\n";
 
       connection->message = std::shared_ptr<Message>(new Message());
@@ -406,7 +410,7 @@ namespace SimpleWeb {
               return;
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
-                 connection->status_code != "101 Web Socket Protocol Handshake") {
+                 connection->status_code.substr(0, 3) != "101") {
                 this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
@@ -521,8 +525,8 @@ namespace SimpleWeb {
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
             int status = 0;
             if(connection->message->length >= 2) {
-              unsigned char byte1 = connection->message->get();
-              unsigned char byte2 = connection->message->get();
+              unsigned char byte1 = static_cast<unsigned char>(connection->message->get());
+              unsigned char byte2 = static_cast<unsigned char>(connection->message->get());
               status = (byte1 << 8) + byte2;
             }
 
@@ -587,10 +591,15 @@ namespace SimpleWeb {
   public:
     SocketClient(const std::string &server_port_path) noexcept : SocketClientBase<WS>::SocketClientBase(server_port_path, 80){};
 
+    void SetProtocol(std::string theProtocol)
+    {
+        SocketClientBase<WS>::protocol = theProtocol;
+    }
+
   protected:
     void connect() override {
       std::unique_lock<std::mutex> lock(connection_mutex);
-      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
+      auto connection = this->_connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
       lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
