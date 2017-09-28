@@ -26,6 +26,8 @@ Run one server and as many clients as you like.  Type the letter for the desired
 
 ## Building
 
+The sample uses [Simple-WebSocket-Server](../README.md) (duh).  You'll need its dependencies installed.
+
 
 #### Windows
 
@@ -39,7 +41,14 @@ Populate the following environmentla variables
 
 Specify the correct generator in your call to cmake
 
-    mkdir /build
+    mkdir build
     cd build
     cmake .. -G "Visual Studio 15 2017 Win64"
 
+Open `build/Simple_WebSocket_Sample.sln` and build it
+
+#### Linux
+
+    mkdir build
+    cd build 
+    cmake ..

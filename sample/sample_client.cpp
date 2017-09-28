@@ -31,30 +31,30 @@ int main(int, char**)
             client->on_open = [&](shared_ptr<WsClient::Connection> connection)
             {
                 _connection = connection;
-                cout << "Client Started & Connection " << connection << " Opened" << endl;
+                cout << "Client Started & Connection " << (size_t)connection.get() << " Opened" << endl << endl;
             };
 
             client->on_close = [&](shared_ptr<WsClient::Connection> connection, int code, const string& reason)
             {
                 _connection = nullptr;
-                cout << "Closed Connection" << connection << " with code: " << code << endl << "Reason: " << reason << endl;
+                cout << "Closed Connection " << (size_t)connection.get() << "(" << code << ")" << endl << "    Reason: " << reason << endl << endl;
             };
 
             client->on_error = [](shared_ptr<WsClient::Connection> connection, const boost::system::error_code& code)
             {
-                cout << "Error (code " << code << ")" << endl << "Message: " << code.message() << endl;
+                cout << "Error in Connection " << (size_t)connection.get() << "(" << code << ")" << endl << "    Code: " << code.message() << endl << endl;
             };
 
             client->on_message = [](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message)
             {
-                cout << "Server Message: " << message->string() << endl;
+                cout << "Server Message on Connection " << (size_t)connection.get() <<  endl << "   Message: " << message->string() << endl << endl;
             };
 
             client_thread = boost::thread([&client]()
             {
                 client->start();
             });
-            cout << "Connection started" << endl;
+            cout << "Connection started" << endl << endl;
         }
         else if (line == "c")
         {
@@ -62,11 +62,11 @@ int main(int, char**)
             {
                 client->stop();
                 client = nullptr;
-                cout << "Stopped Client" << endl;
+                cout << "Stopped Client" << endl << endl;
             }
             else
             {
-                cout << "Client Already Stopped" << endl;
+                cout << "Client Already Stopped" << endl << endl;
             }
 
         }
@@ -79,11 +79,11 @@ int main(int, char**)
                     cout << "Error on send_close Code: " << code
                         << " Message: " << code.message() << endl;
                 });
-                cout << "Closed connection with message" << endl;
+                cout << "Closed connection " << (size_t)_connection.get() << " with message" << endl << endl;
             }
             else
             {
-                cout << "Connection already closed" << endl;
+                cout << "Connection already closed" << endl << endl;
             }
         }
 
@@ -92,7 +92,7 @@ int main(int, char**)
             auto msg = std::make_shared<WsClient::SendStream>();
             *msg << "It's tricky to rock a rhyme to rock a rhyme that's right on time it's tricky!";
             _connection->send(msg);
-            cout << "Message sent" << endl;
+            cout << "Message sent" << endl << endl;
         }
     }
     if (client != nullptr)

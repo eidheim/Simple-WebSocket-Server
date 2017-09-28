@@ -32,7 +32,8 @@ int main(int, char**)
             tunnel.on_message = [&server](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message)
             {
                 auto message_str = message->string();
-                cout << "Client Message: " << message_str << endl;
+                cout << "Client Message from connection " << (size_t)connection.get() << endl
+                   << "    Message: " << message_str << endl << endl;
 
                 auto sendThisBack = make_shared<WsServer::SendStream>();
                 *sendThisBack << "[echo] " << message_str;
@@ -40,31 +41,29 @@ int main(int, char**)
                 {
                     if (code)
                     {
-                        cout << "Error while responding: " << code << ", error message: " << code.message() << endl;
+                        cout << "    Error while responding: " << code << ", error message: " << code.message() << endl << endl;
                     }
                 });
             };
 
             tunnel.on_open = [](shared_ptr<WsServer::Connection> connection)
             {
-                cout << "Opened Connection: " << (size_t)connection.get() << " from: " << connection->remote_endpoint_address 
-                    <<  ":"  << connection->remote_endpoint_port << endl;
+                cout << "Opened Connection: " << (size_t)connection.get() << " from: " << connection->remote_endpoint_address <<  ":"  << connection->remote_endpoint_port << endl << endl;
             };
 
             tunnel.on_close = [](shared_ptr<WsServer::Connection> connection, int status, const string& reason)
             {
-                cout << "Closed Connection: " << (size_t)connection.get() << " from: " << connection->remote_endpoint_address 
-                    <<  ":"  << connection->remote_endpoint_port << endl;
+                cout << "Closed Connection: " << (size_t)connection.get() << " from: " << connection->remote_endpoint_address <<  ":"  << connection->remote_endpoint_port << endl;
 
                 //See RFC 6455 7.4.1. for status codes
-                cout << "ConnectsTo code: " << status << " Reason: " << reason << endl;
+                cout << "    Code: " << status << " Reason: " << reason << endl << endl;
             };
 
             tunnel.on_error = [](shared_ptr<WsServer::Connection> connection, const boost::system::error_code& code)
             {
                 //See http://www.boost.org/doc/libs/1_55_0/doc/html/boost_asio/reference.html, Error Codes for error code meanings
-                cout << "Error in connection " << (size_t)connection.get() << ". " << "Error: " << code 
-                    << ", error message: " << code.message() << endl;
+                cout << "Error in connection " << (size_t)connection.get() << endl;
+                cout << "    Code: " << code << ", Message: " << code.message() << endl << endl;
             };
 
             server_thread = thread([&server]()
@@ -88,7 +87,7 @@ int main(int, char**)
                 i++;
                 auto msg = make_shared<WsServer::SendStream>();
                 *msg << "This is for the kids whippin' up some home-cook, spittin' 86 bars f'n no hook..";
-                cout << "sending message...";
+                cout << "Sending Message..." << endl;
                 connection->send(msg, [&](const boost::system::error_code code)
                 {
                     if (code)
@@ -97,7 +96,7 @@ int main(int, char**)
                             << " Message: " << code.message() << endl;
                     }
                 });
-                cout << "sent" << endl;
+                cout << "    ...sent" << endl;
             }
         }
     }
