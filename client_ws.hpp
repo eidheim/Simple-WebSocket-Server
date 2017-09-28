@@ -333,6 +333,8 @@ namespace SimpleWeb {
     unsigned short port;
     std::string path;
 
+    std::string protocol = "";
+
     std::shared_ptr<Connection> _connection;
     std::mutex connection_mutex;
 
@@ -387,6 +389,8 @@ namespace SimpleWeb {
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
       request << "Sec-WebSocket-Version: 13\r\n";
+      if (protocol != "")
+          request << "Sec-WebSocket-Protocol: " << protocol << "\r\n";
       request << "\r\n";
 
       connection->message = std::shared_ptr<Message>(new Message());
@@ -586,6 +590,11 @@ namespace SimpleWeb {
   class SocketClient<WS> : public SocketClientBase<WS> {
   public:
     SocketClient(const std::string &server_port_path) noexcept : SocketClientBase<WS>::SocketClientBase(server_port_path, 80){};
+
+    void SetProtocol(std::string theProtocol)
+    {
+        SocketClientBase<WS>::protocol = theProtocol;
+    }
 
   protected:
     void connect() override {

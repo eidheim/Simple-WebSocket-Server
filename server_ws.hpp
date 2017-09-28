@@ -149,10 +149,25 @@ namespace SimpleWeb {
         static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
         auto sha1 = Crypto::sha1(header_it->second + ws_magic_string);
 
+        auto proto_it = header.find("Sec-WebSocket-Key");
+
+        bool protocolSpecified = false;
+        std::string protocol;
+        proto_it = header.find("Sec-WebSocket-Protocol");
+        if (proto_it != header.end())
+        {
+            protocolSpecified = true;
+            protocol = proto_it->second;
+        }
+
         handshake << "HTTP/1.1 101 Web Socket Protocol Handshake\r\n";
         handshake << "Upgrade: websocket\r\n";
         handshake << "Connection: Upgrade\r\n";
         handshake << "Sec-WebSocket-Accept: " << Crypto::Base64::encode(sha1) << "\r\n";
+        if (protocolSpecified)
+        {
+            handshake << "Sec-WebSocket-Protocol: " << protocol << "\r\n";
+        }
         handshake << "\r\n";
 
         return true;
