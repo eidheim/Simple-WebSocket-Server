@@ -3,8 +3,6 @@ Simple-WebSocket-Sample
 
 This project contains two executables which allow the user to control the connections and message flow for Simple-WebSocket-Server.  It might be useful for testing interoperability with other websockets implementations.
 
-The following actions are supported.
-
 ### sample_server controls
 
     s :  Start server
@@ -22,8 +20,19 @@ The following actions are supported.
 
 ## Usage
 
-Run one server and as many clients as you like.  Type the letter for the desired action and hit enter.
+Run one server and as many clients as you like.  Type the letter for the desired action and hit enter. A typical session might look like this:
 
+| sample_client | sample_server | Effect |
+| :-----------: | :------------:|:-------|
+|               | **S**tart     | The server starts listening for connections |
+| **S**tart     |               | The client connects to the server |
+| **M**essage   |               | The client sends a message to the server (the server will respond with an echo) |
+|               | **M**essage   | The server sends a message to all connected clients (they will not respond) |
+| c**L**ose     |               | The client disconnects with a message |
+|               | s**T**op      | The server stops listening |
+| s**T**op      |               | The client cleans itself up |
+| **Q**uit      |               | The client quits |
+|               | **Q**uit      | The server quits |
 ## Building
 
 The sample uses [Simple-WebSocket-Server](../README.md) (duh).  You'll need its dependencies installed.
@@ -31,7 +40,7 @@ The sample uses [Simple-WebSocket-Server](../README.md) (duh).  You'll need its 
 
 #### Windows
 
-Populate the following environmentla variables
+Populate the following environmentla variables:
 
 | variable | value |
 |:--|:--|
@@ -39,13 +48,13 @@ Populate the following environmentla variables
 | BoostVer | 1_62 |
 | OpenSSLRoot | C:\path\to\OpenSSL |
 
-Specify the correct generator in your call to cmake
+Specify the correct generator in your call to cmake, this example uses 2017 with a 64 bit build:
 
     mkdir build
     cd build
     cmake .. -G "Visual Studio 15 2017 Win64"
 
-Open `build/Simple_WebSocket_Sample.sln` and build it
+Open in your IDE of choice `build/Simple_WebSocket_Sample.sln` and build it.
 
 #### Linux
 
