@@ -24,7 +24,7 @@ if (WIN32)
     # prereq: populate $env:BoostRoot and $env:BoostVer to tell cmake where boost is
     set(BOOST_ROOT "$ENV{BoostRoot}")
     set(BOOST_LIBRARYDIR "$ENV{BoostRoot}/lib")
-    set(BOOST_INCLUDEDIR "$ENV{BoostRoot}/include/boost-$ENV{SkyBoostVer}")
+    set(BOOST_INCLUDEDIR "$ENV{BoostRoot}/include/boost-$ENV{BoostVer}")
     add_definitions(-DBOOST_ALL_DYN_LINK)
     set(BOOST_COMPONENTS ${BOOST_COMPONENTS} regex)
 
