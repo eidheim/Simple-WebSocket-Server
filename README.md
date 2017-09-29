@@ -40,11 +40,15 @@ cd ..
 
 #### Run server and client examples
 
+
 ### WS
+
 
 ```sh
 ./build/ws_examples
 ```
+
+See also: [Simple-WebSocket-Sample](sample/README.md)
 
 ### WSS
 
@@ -54,3 +58,5 @@ Then:
 ```
 ./build/wss_examples
 ```
+
+

@@ -199,11 +199,11 @@ namespace SimpleWeb {
           size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
-            send_stream->put(static_cast<char>(127 + 128));
+            send_stream->put(static_cast<char>(/*127 + 128*/ 0xFEu));
           }
           else {
             num_bytes = 2;
-            send_stream->put(static_cast<char>(126 + 128));
+            send_stream->put(static_cast<char>(/*126 + 128*/ 0xFEu));
           }
 
           for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
@@ -216,7 +216,7 @@ namespace SimpleWeb {
           send_stream->put(static_cast<char>(mask[c]));
 
         for(size_t c = 0; c < length; c++)
-          send_stream->put(message_stream->get() ^ mask[c % 4]);
+          send_stream->put(static_cast<char>(message_stream->get() ^ mask[c % 4]));
 
         auto self = this->shared_from_this();
         strand.post([self, send_stream, callback]() {
@@ -234,7 +234,7 @@ namespace SimpleWeb {
 
         auto send_stream = std::make_shared<SendStream>();
 
-        send_stream->put(status >> 8);
+        send_stream->put(static_cast<char>(status >> 8));
         send_stream->put(status % 256);
 
         *send_stream << reason;
@@ -333,6 +333,8 @@ namespace SimpleWeb {
     unsigned short port;
     std::string path;
 
+    std::string protocol = "";
+
     std::shared_ptr<Connection> connection;
     std::mutex connection_mutex;
 
@@ -363,8 +365,8 @@ namespace SimpleWeb {
 
     virtual void connect() = 0;
 
-    void handshake(const std::shared_ptr<Connection> &connection) {
-      connection->read_remote_endpoint_data();
+    void handshake(const std::shared_ptr<Connection> &new_connection) {
+      new_connection->read_remote_endpoint_data();
 
       auto write_buffer = std::make_shared<asio::streambuf>();
 
@@ -387,69 +389,71 @@ namespace SimpleWeb {
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
       request << "Sec-WebSocket-Version: 13\r\n";
+      if (protocol != "")
+          request << "Sec-WebSocket-Protocol: " << protocol << "\r\n";
       request << "\r\n";
 
-      connection->message = std::shared_ptr<Message>(new Message());
+      new_connection->message = std::shared_ptr<Message>(new Message());
 
-      connection->set_timeout(config.timeout_request);
-      asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
-        connection->cancel_timeout();
-        auto lock = connection->handler_runner->continue_lock();
+      new_connection->set_timeout(config.timeout_request);
+      asio::async_write(*new_connection->socket, *write_buffer, [this, new_connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+        new_connection->cancel_timeout();
+        auto lock = new_connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
-          connection->set_timeout(this->config.timeout_request);
-          asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
-            connection->cancel_timeout();
-            auto lock = connection->handler_runner->continue_lock();
+          new_connection->set_timeout(this->config.timeout_request);
+          asio::async_read_until(*new_connection->socket, new_connection->message->streambuf, "\r\n\r\n", [this, new_connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+            new_connection->cancel_timeout();
+            auto lock = new_connection->handler_runner->continue_lock();
             if(!lock)
               return;
             if(!ec) {
-              if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
-                 connection->status_code != "101 Web Socket Protocol Handshake") {
-                this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
+              if(!ResponseMessage::parse(*new_connection->message, new_connection->http_version, new_connection->status_code, new_connection->header) ||
+                 new_connection->status_code.substr(0, 3) != "101") {
+                this->connection_error(new_connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
-              auto header_it = connection->header.find("Sec-WebSocket-Accept");
+              auto header_it = new_connection->header.find("Sec-WebSocket-Accept");
               static auto ws_magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-              if(header_it != connection->header.end() &&
+              if(header_it != new_connection->header.end() &&
                  Crypto::Base64::decode(header_it->second) == Crypto::sha1(*nonce_base64 + ws_magic_string)) {
-                this->connection_open(connection);
-                read_message(connection);
+                this->connection_open(new_connection);
+                read_message(new_connection);
               }
               else
-                this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
+                this->connection_error(new_connection, make_error_code::make_error_code(errc::protocol_error));
             }
             else
-              this->connection_error(connection, ec);
+              this->connection_error(new_connection, ec);
           });
         }
         else
-          this->connection_error(connection, ec);
+          this->connection_error(new_connection, ec);
       });
     }
 
-    void read_message(const std::shared_ptr<Connection> &connection) {
-      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t bytes_transferred) {
-        auto lock = connection->handler_runner->continue_lock();
+    void read_message(const std::shared_ptr<Connection> &msg_connection) {
+      asio::async_read(*msg_connection->socket, msg_connection->message->streambuf, asio::transfer_exactly(2), [this, msg_connection](const error_code &ec, size_t bytes_transferred) {
+        auto lock = msg_connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
           if(bytes_transferred == 0) { // TODO: This might happen on server at least, might also happen here
-            this->read_message(connection);
+            this->read_message(msg_connection);
             return;
           }
           std::vector<unsigned char> first_bytes;
           first_bytes.resize(2);
-          connection->message->read(reinterpret_cast<char *>(&first_bytes[0]), 2);
+          msg_connection->message->read(reinterpret_cast<char *>(&first_bytes[0]), 2);
 
-          connection->message->fin_rsv_opcode = first_bytes[0];
+          msg_connection->message->fin_rsv_opcode = first_bytes[0];
 
           // Close connection if masked message from server (protocol error)
           if(first_bytes[1] >= 128) {
             const std::string reason("message from server masked");
-            connection->send_close(1002, reason);
-            this->connection_close(connection, 1002, reason);
+            msg_connection->send_close(1002, reason);
+            this->connection_close(msg_connection, 1002, reason);
             return;
           }
 
@@ -457,123 +461,123 @@ namespace SimpleWeb {
 
           if(length == 126) {
             // 2 next bytes is the size of content
-            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
-              auto lock = connection->handler_runner->continue_lock();
+            asio::async_read(*msg_connection->socket, msg_connection->message->streambuf, asio::transfer_exactly(2), [this, msg_connection](const error_code &ec, size_t /*bytes_transferred*/) {
+              auto lock = msg_connection->handler_runner->continue_lock();
               if(!lock)
                 return;
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(2);
-                connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
+                msg_connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
 
                 size_t length = 0;
                 size_t num_bytes = 2;
                 for(size_t c = 0; c < num_bytes; c++)
                   length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
-                connection->message->length = length;
-                this->read_message_content(connection);
+                msg_connection->message->length = length;
+                this->read_message_content(msg_connection);
               }
               else
-                this->connection_error(connection, ec);
+                this->connection_error(msg_connection, ec);
             });
           }
           else if(length == 127) {
             // 8 next bytes is the size of content
-            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(8), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
-              auto lock = connection->handler_runner->continue_lock();
+            asio::async_read(*msg_connection->socket, msg_connection->message->streambuf, asio::transfer_exactly(8), [this, msg_connection](const error_code &ec, size_t /*bytes_transferred*/) {
+              auto lock = msg_connection->handler_runner->continue_lock();
               if(!lock)
                 return;
               if(!ec) {
                 std::vector<unsigned char> length_bytes;
                 length_bytes.resize(8);
-                connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
+                msg_connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
 
                 size_t length = 0;
                 size_t num_bytes = 8;
                 for(size_t c = 0; c < num_bytes; c++)
                   length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
-                connection->message->length = length;
-                this->read_message_content(connection);
+                msg_connection->message->length = length;
+                this->read_message_content(msg_connection);
               }
               else
-                this->connection_error(connection, ec);
+                this->connection_error(msg_connection, ec);
             });
           }
           else {
-            connection->message->length = length;
-            this->read_message_content(connection);
+            msg_connection->message->length = length;
+            this->read_message_content(msg_connection);
           }
         }
         else
-          this->connection_error(connection, ec);
+          this->connection_error(msg_connection, ec);
       });
     }
 
-    void read_message_content(const std::shared_ptr<Connection> &connection) {
-      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
-        auto lock = connection->handler_runner->continue_lock();
+    void read_message_content(const std::shared_ptr<Connection> &msg_connection) {
+      asio::async_read(*msg_connection->socket, msg_connection->message->streambuf, asio::transfer_exactly(msg_connection->message->length), [this, msg_connection](const error_code &ec, size_t /*bytes_transferred*/) {
+        auto lock = msg_connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
           // If connection close
-          if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
+          if((msg_connection->message->fin_rsv_opcode & 0x0f) == 8) {
             int status = 0;
-            if(connection->message->length >= 2) {
-              unsigned char byte1 = connection->message->get();
-              unsigned char byte2 = connection->message->get();
+            if(msg_connection->message->length >= 2) {
+              unsigned char byte1 = static_cast<unsigned char>(msg_connection->message->get());
+              unsigned char byte2 = static_cast<unsigned char>(msg_connection->message->get());
               status = (byte1 << 8) + byte2;
             }
 
-            auto reason = connection->message->string();
-            connection->send_close(status, reason);
-            this->connection_close(connection, status, reason);
+            auto reason = msg_connection->message->string();
+            msg_connection->send_close(status, reason);
+            this->connection_close(msg_connection, status, reason);
             return;
           }
           // If ping
-          else if((connection->message->fin_rsv_opcode & 0x0f) == 9) {
+          else if((msg_connection->message->fin_rsv_opcode & 0x0f) == 9) {
             // Send pong
             auto empty_send_stream = std::make_shared<SendStream>();
-            connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
+            msg_connection->send(empty_send_stream, nullptr, msg_connection->message->fin_rsv_opcode + 1);
           }
           else if(this->on_message) {
-            connection->cancel_timeout();
-            connection->set_timeout();
-            this->on_message(connection, connection->message);
+            msg_connection->cancel_timeout();
+            msg_connection->set_timeout();
+            this->on_message(msg_connection, msg_connection->message);
           }
 
           // Next message
-          connection->message = std::shared_ptr<Message>(new Message());
-          this->read_message(connection);
+          msg_connection->message = std::shared_ptr<Message>(new Message());
+          this->read_message(msg_connection);
         }
         else
-          this->connection_error(connection, ec);
+          this->connection_error(msg_connection, ec);
       });
     }
 
-    void connection_open(const std::shared_ptr<Connection> &connection) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+    void connection_open(const std::shared_ptr<Connection> &opening_connection) const {
+      opening_connection->cancel_timeout();
+      opening_connection->set_timeout();
 
       if(on_open)
-        on_open(connection);
+        on_open(opening_connection);
     }
 
-    void connection_close(const std::shared_ptr<Connection> &connection, int status, const std::string &reason) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+    void connection_close(const std::shared_ptr<Connection> &closing_connection, int status, const std::string &reason) const {
+      closing_connection->cancel_timeout();
+      closing_connection->set_timeout();
 
       if(on_close)
-        on_close(connection, status, reason);
+        on_close(closing_connection, status, reason);
     }
 
-    void connection_error(const std::shared_ptr<Connection> &connection, const error_code &ec) const {
-      connection->cancel_timeout();
-      connection->set_timeout();
+    void connection_error(const std::shared_ptr<Connection> &err_connection, const error_code &ec) const {
+      err_connection->cancel_timeout();
+      err_connection->set_timeout();
 
       if(on_error)
-        on_error(connection, ec);
+        on_error(err_connection, ec);
     }
   };
 
@@ -587,38 +591,43 @@ namespace SimpleWeb {
   public:
     SocketClient(const std::string &server_port_path) noexcept : SocketClientBase<WS>::SocketClientBase(server_port_path, 80){};
 
+    void SetProtocol(std::string theProtocol)
+    {
+        SocketClientBase<WS>::protocol = theProtocol;
+    }
+
   protected:
     void connect() override {
       std::unique_lock<std::mutex> lock(connection_mutex);
-      auto connection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
+      auto newConnection = this->connection = std::shared_ptr<Connection>(new Connection(handler_runner, config.timeout_idle, *io_service));
       lock.unlock();
       asio::ip::tcp::resolver::query query(host, std::to_string(port));
       auto resolver = std::make_shared<asio::ip::tcp::resolver>(*io_service);
-      connection->set_timeout(config.timeout_request);
-      resolver->async_resolve(query, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
-        connection->cancel_timeout();
-        auto lock = connection->handler_runner->continue_lock();
+      newConnection->set_timeout(config.timeout_request);
+      resolver->async_resolve(query, [this, newConnection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator it) {
+        newConnection->cancel_timeout();
+        auto lock = newConnection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
-          connection->set_timeout(this->config.timeout_request);
-          asio::async_connect(*connection->socket, it, [this, connection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
-            connection->cancel_timeout();
-            auto lock = connection->handler_runner->continue_lock();
+          newConnection->set_timeout(this->config.timeout_request);
+          asio::async_connect(*newConnection->socket, it, [this, newConnection, resolver](const error_code &ec, asio::ip::tcp::resolver::iterator /*it*/) {
+            newConnection->cancel_timeout();
+            auto lock = newConnection->handler_runner->continue_lock();
             if(!lock)
               return;
             if(!ec) {
               asio::ip::tcp::no_delay option(true);
-              connection->socket->set_option(option);
+              newConnection->socket->set_option(option);
 
-              this->handshake(connection);
+              this->handshake(newConnection);
             }
             else
-              this->connection_error(connection, ec);
+              this->connection_error(newConnection, ec);
           });
         }
         else
-          this->connection_error(connection, ec);
+          this->connection_error(newConnection, ec);
       });
     }
   };

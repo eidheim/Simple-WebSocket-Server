@@ -212,8 +212,8 @@ namespace SimpleWeb {
     static std::string pbkdf2(const std::string &password, const std::string &salt, int iterations, int key_size) noexcept {
       std::string key;
       key.resize(static_cast<size_t>(key_size));
-      PKCS5_PBKDF2_HMAC_SHA1(password.c_str(), password.size(),
-                             reinterpret_cast<const unsigned char *>(salt.c_str()), salt.size(), iterations,
+      PKCS5_PBKDF2_HMAC_SHA1(password.c_str(), static_cast<int>(password.size()),
+                             reinterpret_cast<const unsigned char *>(salt.c_str()), static_cast<int>(salt.size()), iterations,
                              key_size, reinterpret_cast<unsigned char *>(&key[0]));
       return key;
     }
