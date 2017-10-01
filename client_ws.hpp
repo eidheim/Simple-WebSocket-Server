@@ -410,7 +410,7 @@ namespace SimpleWeb {
               return;
             if(!ec) {
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
-                 connection->status_code.substr(0, 3) != "101") {
+                 connection->status_code.empty() || connection->status_code.compare(0, 3, "101") != 0) {
                 this->connection_error(connection, make_error_code::make_error_code(errc::protocol_error));
                 return;
               }
