@@ -283,7 +283,8 @@ namespace SimpleWeb {
       long timeout_request = 0;
       /// Idle timeout. Defaults to no timeout.
       long timeout_idle = 0;
-      /// Additional header fields. Use this variable to for instance set Sec-WebSocket-Protocol.
+      /// Additional header fields to send when performing WebSocket handshake.
+      /// Use this variable to for instance set Sec-WebSocket-Protocol.
       CaseInsensitiveMultimap header;
     };
     /// Set before calling start().
