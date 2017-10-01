@@ -283,6 +283,8 @@ namespace SimpleWeb {
       long timeout_request = 0;
       /// Idle timeout. Defaults to no timeout.
       long timeout_idle = 0;
+      /// Additional header fields. Use this variable to for instance set Sec-WebSocket-Protocol.
+      CaseInsensitiveMultimap header;
     };
     /// Set before calling start().
     Config config;
@@ -387,6 +389,8 @@ namespace SimpleWeb {
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
       request << "Sec-WebSocket-Version: 13\r\n";
+      for(auto &header_field : config.header)
+        request << header_field.first << ": " << header_field.second << "\r\n";
       request << "\r\n";
 
       connection->message = std::shared_ptr<Message>(new Message());
