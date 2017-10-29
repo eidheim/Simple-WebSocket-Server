@@ -51,7 +51,7 @@ namespace SimpleWeb {
       SendStream() noexcept : std::iostream(&streambuf) {}
 
       /// Returns the size of the buffer
-      size_t size() const noexcept {
+      std::size_t size() const noexcept {
         return streambuf.size();
       }
     };
@@ -143,7 +143,7 @@ namespace SimpleWeb {
       void send_from_queue() {
         auto self = this->shared_from_this();
         strand.post([self]() {
-          asio::async_write(*self->socket, self->send_queue.begin()->send_stream->streambuf, self->strand.wrap([self](const error_code &ec, size_t /*bytes_transferred*/) {
+          asio::async_write(*self->socket, self->send_queue.begin()->send_stream->streambuf, self->strand.wrap([self](const error_code &ec, std::size_t /*bytes_transferred*/) {
             auto lock = self->handler_runner->continue_lock();
             if(!lock)
               return;
@@ -186,17 +186,17 @@ namespace SimpleWeb {
         mask.resize(4);
         std::uniform_int_distribution<unsigned short> dist(0, 255);
         std::random_device rd;
-        for(size_t c = 0; c < 4; c++)
+        for(std::size_t c = 0; c < 4; c++)
           mask[c] = static_cast<unsigned char>(dist(rd));
 
         auto send_stream = std::make_shared<SendStream>();
 
-        size_t length = message_stream->size();
+        std::size_t length = message_stream->size();
 
         send_stream->put(static_cast<char>(fin_rsv_opcode));
         // Masked (first length byte>=128)
         if(length >= 126) {
-          size_t num_bytes;
+          std::size_t num_bytes;
           if(length > 0xffff) {
             num_bytes = 8;
             send_stream->put(static_cast<char>(127 + 128));
@@ -206,16 +206,16 @@ namespace SimpleWeb {
             send_stream->put(static_cast<char>(126 + 128));
           }
 
-          for(size_t c = num_bytes - 1; c != static_cast<size_t>(-1); c--)
+          for(std::size_t c = num_bytes - 1; c != static_cast<std::size_t>(-1); c--)
             send_stream->put((static_cast<unsigned long long>(length) >> (8 * c)) % 256);
         }
         else
           send_stream->put(static_cast<char>(length + 128));
 
-        for(size_t c = 0; c < 4; c++)
+        for(std::size_t c = 0; c < 4; c++)
           send_stream->put(static_cast<char>(mask[c]));
 
-        for(size_t c = 0; c < length; c++)
+        for(std::size_t c = 0; c < length; c++)
           send_stream->put(message_stream->get() ^ mask[c % 4]);
 
         auto self = this->shared_from_this();
@@ -250,7 +250,7 @@ namespace SimpleWeb {
 
     public:
       unsigned char fin_rsv_opcode;
-      size_t size() noexcept {
+      std::size_t size() noexcept {
         return length;
       }
 
@@ -268,7 +268,7 @@ namespace SimpleWeb {
 
     private:
       Message() noexcept : std::istream(&streambuf) {}
-      size_t length;
+      std::size_t length;
       asio::streambuf streambuf;
     };
 
@@ -342,8 +342,8 @@ namespace SimpleWeb {
     std::shared_ptr<ScopeRunner> handler_runner;
 
     SocketClientBase(const std::string &host_port_path, unsigned short default_port) noexcept : handler_runner(new ScopeRunner()) {
-      size_t host_end = host_port_path.find(':');
-      size_t host_port_end = host_port_path.find('/');
+      std::size_t host_end = host_port_path.find(':');
+      std::size_t host_port_end = host_port_path.find('/');
       if(host_end == std::string::npos) {
         host_end = host_port_end;
         port = default_port;
@@ -384,7 +384,7 @@ namespace SimpleWeb {
       nonce.resize(16);
       std::uniform_int_distribution<unsigned short> dist(0, 255);
       std::random_device rd;
-      for(size_t c = 0; c < 16; c++)
+      for(std::size_t c = 0; c < 16; c++)
         nonce[c] = static_cast<char>(dist(rd));
 
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
@@ -397,14 +397,14 @@ namespace SimpleWeb {
       connection->message = std::shared_ptr<Message>(new Message());
 
       connection->set_timeout(config.timeout_request);
-      asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+      asio::async_write(*connection->socket, *write_buffer, [this, connection, write_buffer, nonce_base64](const error_code &ec, std::size_t /*bytes_transferred*/) {
         connection->cancel_timeout();
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
         if(!ec) {
           connection->set_timeout(this->config.timeout_request);
-          asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, size_t /*bytes_transferred*/) {
+          asio::async_read_until(*connection->socket, connection->message->streambuf, "\r\n\r\n", [this, connection, nonce_base64](const error_code &ec, std::size_t /*bytes_transferred*/) {
             connection->cancel_timeout();
             auto lock = connection->handler_runner->continue_lock();
             if(!lock)
@@ -435,7 +435,7 @@ namespace SimpleWeb {
     }
 
     void read_message(const std::shared_ptr<Connection> &connection) {
-      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t bytes_transferred) {
+      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, std::size_t bytes_transferred) {
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
@@ -458,11 +458,11 @@ namespace SimpleWeb {
             return;
           }
 
-          size_t length = (first_bytes[1] & 127);
+          std::size_t length = (first_bytes[1] & 127);
 
           if(length == 126) {
             // 2 next bytes is the size of content
-            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(2), [this, connection](const error_code &ec, std::size_t /*bytes_transferred*/) {
               auto lock = connection->handler_runner->continue_lock();
               if(!lock)
                 return;
@@ -471,10 +471,10 @@ namespace SimpleWeb {
                 length_bytes.resize(2);
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
 
-                size_t length = 0;
-                size_t num_bytes = 2;
-                for(size_t c = 0; c < num_bytes; c++)
-                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
+                std::size_t length = 0;
+                std::size_t num_bytes = 2;
+                for(std::size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<std::size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
                 this->read_message_content(connection);
@@ -485,7 +485,7 @@ namespace SimpleWeb {
           }
           else if(length == 127) {
             // 8 next bytes is the size of content
-            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(8), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+            asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(8), [this, connection](const error_code &ec, std::size_t /*bytes_transferred*/) {
               auto lock = connection->handler_runner->continue_lock();
               if(!lock)
                 return;
@@ -494,10 +494,10 @@ namespace SimpleWeb {
                 length_bytes.resize(8);
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
 
-                size_t length = 0;
-                size_t num_bytes = 8;
-                for(size_t c = 0; c < num_bytes; c++)
-                  length += static_cast<size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
+                std::size_t length = 0;
+                std::size_t num_bytes = 8;
+                for(std::size_t c = 0; c < num_bytes; c++)
+                  length += static_cast<std::size_t>(length_bytes[c]) << (8 * (num_bytes - 1 - c));
 
                 connection->message->length = length;
                 this->read_message_content(connection);
@@ -517,7 +517,7 @@ namespace SimpleWeb {
     }
 
     void read_message_content(const std::shared_ptr<Connection> &connection) {
-      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, size_t /*bytes_transferred*/) {
+      asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, std::size_t /*bytes_transferred*/) {
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
           return;
