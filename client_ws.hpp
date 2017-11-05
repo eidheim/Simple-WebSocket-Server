@@ -65,8 +65,19 @@ namespace SimpleWeb {
     public:
       std::string http_version, status_code;
       CaseInsensitiveMultimap header;
-      std::string remote_endpoint_address;
-      unsigned short remote_endpoint_port;
+
+      std::string remote_endpoint_address() noexcept {
+        try {
+          return remote_endpoint.address().to_string();
+        }
+        catch(...) {
+          return std::string();
+        }
+      }
+
+      unsigned short remote_endpoint_port() noexcept {
+        return remote_endpoint.port();
+      }
 
     private:
       template <typename... Args>
@@ -83,6 +94,8 @@ namespace SimpleWeb {
       long timeout_idle;
       std::unique_ptr<asio::steady_timer> timer;
       std::mutex timer_mutex;
+
+      asio::ip::tcp::endpoint remote_endpoint;
 
       void close() noexcept {
         error_code ec;
@@ -163,10 +176,9 @@ namespace SimpleWeb {
 
       std::atomic<bool> closed;
 
-      void read_remote_endpoint_data() noexcept {
+      void read_remote_endpoint() noexcept {
         try {
-          remote_endpoint_address = socket->lowest_layer().remote_endpoint().address().to_string();
-          remote_endpoint_port = socket->lowest_layer().remote_endpoint().port();
+          remote_endpoint = socket->lowest_layer().remote_endpoint();
         }
         catch(const std::exception &e) {
           std::cerr << e.what() << std::endl;
@@ -367,7 +379,7 @@ namespace SimpleWeb {
     virtual void connect() = 0;
 
     void handshake(const std::shared_ptr<Connection> &connection) {
-      connection->read_remote_endpoint_data();
+      connection->read_remote_endpoint();
 
       auto write_buffer = std::make_shared<asio::streambuf>();
 
