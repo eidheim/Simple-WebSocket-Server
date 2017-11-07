@@ -76,6 +76,8 @@ namespace SimpleWeb {
 
       regex::smatch path_match;
 
+      asio::ip::tcp::endpoint remote_endpoint;
+
       std::string remote_endpoint_address() noexcept {
         try {
           return remote_endpoint.address().to_string();
@@ -104,8 +106,6 @@ namespace SimpleWeb {
       long timeout_idle;
       std::unique_ptr<asio::steady_timer> timer;
       std::mutex timer_mutex;
-
-      asio::ip::tcp::endpoint remote_endpoint;
 
       void close() noexcept {
         error_code ec;
@@ -457,8 +457,7 @@ namespace SimpleWeb {
      *   connection->query_string=std::move(request->query_string);
      *   connection->http_version=std::move(request->http_version);
      *   connection->header=std::move(request->header);
-     *   connection->remote_endpoint_address=std::move(request->remote_endpoint_address);
-     *   connection->remote_endpoint_port=request->remote_endpoint_port;
+     *   connection->remote_endpoint=*request->remote_endpoint;
      *   socket_server.upgrade(connection);
      * }
      */

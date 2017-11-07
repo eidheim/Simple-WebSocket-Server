@@ -66,6 +66,8 @@ namespace SimpleWeb {
       std::string http_version, status_code;
       CaseInsensitiveMultimap header;
 
+      asio::ip::tcp::endpoint remote_endpoint;
+
       std::string remote_endpoint_address() noexcept {
         try {
           return remote_endpoint.address().to_string();
@@ -94,8 +96,6 @@ namespace SimpleWeb {
       long timeout_idle;
       std::unique_ptr<asio::steady_timer> timer;
       std::mutex timer_mutex;
-
-      asio::ip::tcp::endpoint remote_endpoint;
 
       void close() noexcept {
         error_code ec;
