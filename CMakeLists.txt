@@ -45,7 +45,7 @@ find_package(OpenSSL REQUIRED)
 target_link_libraries(simple-websocket-server INTERFACE ${OPENSSL_LIBRARIES})
 target_include_directories(simple-websocket-server INTERFACE ${OPENSSL_INCLUDE_DIR})
 
-# If Simple-Web-Server is not a sub-project:
+# If Simple-WebSocket-Server is not a sub-project:
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     add_executable(ws_examples ws_examples.cpp)
     target_link_libraries(ws_examples simple-websocket-server)
