@@ -457,7 +457,7 @@ namespace SimpleWeb {
      *   connection->query_string=std::move(request->query_string);
      *   connection->http_version=std::move(request->http_version);
      *   connection->header=std::move(request->header);
-     *   connection->remote_endpoint=*request->remote_endpoint;
+     *   connection->remote_endpoint=std::move(*request->remote_endpoint);
      *   socket_server.upgrade(connection);
      * }
      */
