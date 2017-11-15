@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <iostream>
+#include <limits>
 #include <list>
 #include <mutex>
 #include <random>
@@ -291,6 +292,9 @@ namespace SimpleWeb {
       long timeout_request = 0;
       /// Idle timeout. Defaults to no timeout.
       long timeout_idle = 0;
+      /// Maximum size of incoming messages. Defaults to architecture maximum.
+      /// Exceeding this limit will result in a message_size error code and the connection will be closed.
+      std::size_t max_message_size = std::numeric_limits<std::size_t>::max();
       /// Additional header fields to send when performing WebSocket handshake.
       /// Use this variable to for instance set Sec-WebSocket-Protocol.
       CaseInsensitiveMultimap header;
@@ -525,6 +529,14 @@ namespace SimpleWeb {
     }
 
     void read_message_content(const std::shared_ptr<Connection> &connection) {
+      if(connection->message->length > config.max_message_size) {
+        connection_error(connection, make_error_code::make_error_code(errc::message_size));
+        const int status = 1009;
+        const std::string reason = "message too big";
+        connection->send_close(status, reason);
+        connection_close(connection, status, reason);
+        return;
+      }
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(connection->message->length), [this, connection](const error_code &ec, std::size_t /*bytes_transferred*/) {
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)

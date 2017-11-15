@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <iostream>
+#include <limits>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -17,6 +18,8 @@
 #include <asio/steady_timer.hpp>
 namespace SimpleWeb {
   using error_code = std::error_code;
+  using errc = std::errc;
+  namespace make_error_code = std;
 } // namespace SimpleWeb
 #else
 #include <boost/asio.hpp>
@@ -24,6 +27,8 @@ namespace SimpleWeb {
 namespace SimpleWeb {
   namespace asio = boost::asio;
   using error_code = boost::system::error_code;
+  namespace errc = boost::system::errc;
+  namespace make_error_code = boost::system::errc;
 } // namespace SimpleWeb
 #endif
 
@@ -348,6 +353,9 @@ namespace SimpleWeb {
       long timeout_request = 5;
       /// Idle timeout. Defaults to no timeout.
       long timeout_idle = 0;
+      /// Maximum size of incoming messages. Defaults to architecture maximum.
+      /// Exceeding this limit will result in a message_size error code and the connection will be closed.
+      std::size_t max_message_size = std::numeric_limits<std::size_t>::max();
       /// IPv4 address in dotted decimal form or IPv6 address in hexadecimal notation.
       /// If empty, the address will be any address.
       std::string address;
@@ -611,6 +619,14 @@ namespace SimpleWeb {
     }
 
     void read_message_content(const std::shared_ptr<Connection> &connection, std::size_t length, Endpoint &endpoint, unsigned char fin_rsv_opcode) const {
+      if(length > config.max_message_size) {
+        connection_error(connection, endpoint, make_error_code::make_error_code(errc::message_size));
+        const int status = 1009;
+        const std::string reason = "message too big";
+        connection->send_close(status, reason);
+        connection_close(connection, endpoint, status, reason);
+        return;
+      }
       asio::async_read(*connection->socket, connection->read_buffer, asio::transfer_exactly(4 + length), [this, connection, length, &endpoint, fin_rsv_opcode](const error_code &ec, std::size_t /*bytes_transferred*/) {
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
