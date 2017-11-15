@@ -32,8 +32,10 @@ int main() {
     });
   };
 
-  echo.on_open = [&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/) {
+  echo.on_open = [&server_callback_count](shared_ptr<WsServer::Connection> connection) {
     ++server_callback_count;
+    assert(!connection->remote_endpoint_address().empty());
+    assert(connection->remote_endpoint_port() > 0);
   };
 
   echo.on_close = [&server_callback_count](shared_ptr<WsServer::Connection> /*connection*/, int /*status*/, const string & /*reason*/) {
