@@ -52,6 +52,33 @@ namespace SimpleWeb {
   template <class socket_type>
   class SocketServerBase {
   public:
+    class Message : public std::istream {
+      friend class SocketServerBase<socket_type>;
+
+    public:
+      unsigned char fin_rsv_opcode;
+      std::size_t size() noexcept {
+        return length;
+      }
+
+      /// Convenience function to return std::string. The stream buffer is consumed.
+      std::string string() noexcept {
+        try {
+          std::stringstream ss;
+          ss << rdbuf();
+          return ss.str();
+        }
+        catch(...) {
+          return std::string();
+        }
+      }
+
+    private:
+      Message() noexcept : std::istream(&streambuf), length(0) {}
+      std::size_t length;
+      asio::streambuf streambuf;
+    };
+
     /// The buffer is not consumed during send operations.
     /// Do not alter while sending.
     class SendStream : public std::ostream {
@@ -107,6 +134,7 @@ namespace SimpleWeb {
       std::mutex socket_close_mutex;
 
       asio::streambuf read_buffer;
+      std::shared_ptr<Message> fragmented_message;
 
       long timeout_idle;
       std::unique_ptr<asio::steady_timer> timer;
@@ -236,14 +264,14 @@ namespace SimpleWeb {
     public:
       /// fin_rsv_opcode: 129=one fragment, text, 130=one fragment, binary, 136=close connection.
       /// See http://tools.ietf.org/html/rfc6455#section-5.2 for more information
-      void send(const std::shared_ptr<SendStream> &message_stream, const std::function<void(const error_code &)> &callback = nullptr,
+      void send(const std::shared_ptr<SendStream> &send_stream, const std::function<void(const error_code &)> &callback = nullptr,
                 unsigned char fin_rsv_opcode = 129) {
         cancel_timeout();
         set_timeout();
 
         auto header_stream = std::make_shared<SendStream>();
 
-        std::size_t length = message_stream->size();
+        std::size_t length = send_stream->size();
 
         header_stream->put(static_cast<char>(fin_rsv_opcode));
         // Unmasked (first length byte<128)
@@ -265,8 +293,8 @@ namespace SimpleWeb {
           header_stream->put(static_cast<char>(length));
 
         auto self = this->shared_from_this();
-        strand.post([self, header_stream, message_stream, callback]() {
-          self->send_queue.emplace_back(header_stream, message_stream, callback);
+        strand.post([self, header_stream, send_stream, callback]() {
+          self->send_queue.emplace_back(header_stream, send_stream, callback);
           if(self->send_queue.size() == 1)
             self->send_from_queue();
         });
@@ -288,33 +316,6 @@ namespace SimpleWeb {
         // fin_rsv_opcode=136: message close
         send(send_stream, callback, 136);
       }
-    };
-
-    class Message : public std::istream {
-      friend class SocketServerBase<socket_type>;
-
-    public:
-      unsigned char fin_rsv_opcode;
-      std::size_t size() noexcept {
-        return length;
-      }
-
-      /// Convenience function to return std::string. The stream buffer is consumed.
-      std::string string() noexcept {
-        try {
-          std::stringstream ss;
-          ss << rdbuf();
-          return ss.str();
-        }
-        catch(...) {
-          return std::string();
-        }
-      }
-
-    private:
-      Message() noexcept : std::istream(&streambuf) {}
-      std::size_t length;
-      asio::streambuf streambuf;
     };
 
     class Endpoint {
@@ -619,7 +620,7 @@ namespace SimpleWeb {
     }
 
     void read_message_content(const std::shared_ptr<Connection> &connection, std::size_t length, Endpoint &endpoint, unsigned char fin_rsv_opcode) const {
-      if(length > config.max_message_size) {
+      if(length + (connection->fragmented_message ? connection->fragmented_message->length : 0) > config.max_message_size) {
         connection_error(connection, endpoint, make_error_code::make_error_code(errc::message_size));
         const int status = 1009;
         const std::string reason = "message too big";
@@ -632,55 +633,77 @@ namespace SimpleWeb {
         if(!lock)
           return;
         if(!ec) {
-          std::istream raw_message_data(&connection->read_buffer);
+          std::istream istream(&connection->read_buffer);
 
           // Read mask
           std::vector<unsigned char> mask;
           mask.resize(4);
-          raw_message_data.read((char *)&mask[0], 4);
+          istream.read((char *)&mask[0], 4);
 
-          std::shared_ptr<Message> message(new Message());
-          message->length = length;
-          message->fin_rsv_opcode = fin_rsv_opcode;
+          std::shared_ptr<Message> message;
 
-          std::ostream message_data_out_stream(&message->streambuf);
-          for(std::size_t c = 0; c < length; c++) {
-            message_data_out_stream.put(raw_message_data.get() ^ mask[c % 4]);
+          if((fin_rsv_opcode & 0x80) == 0 || connection->fragmented_message) {
+            if(!connection->fragmented_message) {
+              connection->fragmented_message = std::shared_ptr<Message>(new Message());
+              connection->fragmented_message->fin_rsv_opcode = fin_rsv_opcode | 0x80;
+            }
+            connection->fragmented_message->length += length;
+            std::ostream ostream(&connection->fragmented_message->streambuf);
+            for(std::size_t c = 0; c < length; c++)
+              ostream.put(istream.get() ^ mask[c % 4]);
+          }
+          else {
+            message = std::shared_ptr<Message>(new Message());
+            message->length = length;
+            message->fin_rsv_opcode = fin_rsv_opcode;
+            std::ostream ostream(&message->streambuf);
+            for(std::size_t c = 0; c < length; c++)
+              ostream.put(istream.get() ^ mask[c % 4]);
           }
 
           // If connection close
           if((fin_rsv_opcode & 0x0f) == 8) {
+            auto &msg = connection->fragmented_message ? connection->fragmented_message : message;
             int status = 0;
             if(length >= 2) {
-              unsigned char byte1 = message->get();
-              unsigned char byte2 = message->get();
+              unsigned char byte1 = msg->get();
+              unsigned char byte2 = msg->get();
               status = (byte1 << 8) + byte2;
             }
 
-            auto reason = message->string();
+            auto reason = msg->string();
             connection->send_close(status, reason);
-            connection_close(connection, endpoint, status, reason);
+            this->connection_close(connection, endpoint, status, reason);
+            return;
+          }
+          // If ping
+          else if((fin_rsv_opcode & 0x0f) == 9) {
+            // Send pong
+            auto empty_send_stream = std::make_shared<SendStream>();
+            connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
+          }
+          // If fragmented message and not final fragment
+          else if((fin_rsv_opcode & 0x80) == 0) {
+            // Next message
+            this->read_message(connection, endpoint);
             return;
           }
           else {
-            // If ping
-            if((fin_rsv_opcode & 0x0f) == 9) {
-              // Send pong
-              auto empty_send_stream = std::make_shared<SendStream>();
-              connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
-            }
-            else if(endpoint.on_message) {
-              connection->cancel_timeout();
-              connection->set_timeout();
-              endpoint.on_message(connection, message);
-            }
+            connection->cancel_timeout();
+            connection->set_timeout();
 
-            // Next message
-            read_message(connection, endpoint);
+            if(endpoint.on_message) {
+              auto &msg = connection->fragmented_message ? connection->fragmented_message : message;
+              endpoint.on_message(connection, msg);
+            }
           }
+
+          // Next message
+          connection->fragmented_message = nullptr;
+          this->read_message(connection, endpoint);
         }
         else
-          connection_error(connection, endpoint, ec);
+          this->connection_error(connection, endpoint, ec);
       });
     }
 

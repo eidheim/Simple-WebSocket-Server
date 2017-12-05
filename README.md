@@ -7,7 +7,7 @@ See https://github.com/eidheim/Simple-Web-Server for an easy way to make REST re
 
 ### Features
 
-* RFC 6455 mostly supported: text/binary frames, ping-pong, connection close with status and reason.
+* RFC 6455 mostly supported: text/binary frames, fragmented messages, ping-pong, connection close with status and reason.
 * Asynchronous message handling
 * Thread pool if needed
 * Platform independent
