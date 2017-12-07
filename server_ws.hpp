@@ -642,6 +642,7 @@ namespace SimpleWeb {
 
           std::shared_ptr<Message> message;
 
+          // If fragmented message or final fragment of a fragmented message
           if((fin_rsv_opcode & 0x80) == 0 || connection->fragmented_message) {
             if(!connection->fragmented_message) {
               connection->fragmented_message = std::shared_ptr<Message>(new Message());
