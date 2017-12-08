@@ -554,8 +554,10 @@ namespace SimpleWeb {
           size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
           std::shared_ptr<Message> next_message;
           if(num_additional_bytes > 0) { // Extract bytes that are not extra bytes in buffer (only happen when several messages are sent in handshake response)
-            auto next_message = connection->message;
+            next_message = connection->message;
             connection->message = std::shared_ptr<Message>(new Message());
+            connection->message->fin_rsv_opcode = next_message->fin_rsv_opcode;
+            connection->message->length = next_message->length;
             std::ostream ostream(&connection->message->streambuf);
             for(size_t c = 0; c < next_message->length; ++c)
               ostream.put(next_message->get());
