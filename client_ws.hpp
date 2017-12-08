@@ -4,6 +4,7 @@
 #include "crypto.hpp"
 #include "utility.hpp"
 
+#include <array>
 #include <atomic>
 #include <iostream>
 #include <limits>
@@ -217,8 +218,7 @@ namespace SimpleWeb {
         set_timeout();
 
         // Create mask
-        std::vector<unsigned char> mask;
-        mask.resize(4);
+        std::array<unsigned char, 4> mask;
         std::uniform_int_distribution<unsigned short> dist(0, 255);
         std::random_device rd;
         for(std::size_t c = 0; c < 4; c++)
@@ -393,11 +393,11 @@ namespace SimpleWeb {
 
       // Make random 16-byte nonce
       std::string nonce;
-      nonce.resize(16);
+      nonce.reserve(16);
       std::uniform_int_distribution<unsigned short> dist(0, 255);
       std::random_device rd;
       for(std::size_t c = 0; c < 16; c++)
-        nonce[c] = static_cast<char>(dist(rd));
+        nonce += static_cast<char>(dist(rd));
 
       auto nonce_base64 = std::make_shared<std::string>(Crypto::Base64::encode(nonce));
       request << "Sec-WebSocket-Key: " << *nonce_base64 << "\r\n";
@@ -464,8 +464,7 @@ namespace SimpleWeb {
           }
           size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
-          std::vector<unsigned char> first_bytes;
-          first_bytes.resize(2);
+          std::array<unsigned char, 2> first_bytes;
           connection->message->read(reinterpret_cast<char *>(&first_bytes[0]), 2);
 
           connection->message->fin_rsv_opcode = first_bytes[0];
@@ -489,8 +488,7 @@ namespace SimpleWeb {
               if(!ec) {
                 size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
-                std::vector<unsigned char> length_bytes;
-                length_bytes.resize(2);
+                std::array<unsigned char, 2> length_bytes;
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
 
                 std::size_t length = 0;
@@ -514,8 +512,7 @@ namespace SimpleWeb {
               if(!ec) {
                 size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
-                std::vector<unsigned char> length_bytes;
-                length_bytes.resize(8);
+                std::array<unsigned char, 8> length_bytes;
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
 
                 std::size_t length = 0;

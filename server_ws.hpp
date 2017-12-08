@@ -4,6 +4,7 @@
 #include "crypto.hpp"
 #include "utility.hpp"
 
+#include <array>
 #include <atomic>
 #include <iostream>
 #include <limits>
@@ -549,8 +550,7 @@ namespace SimpleWeb {
           }
           std::istream stream(&connection->read_buffer);
 
-          std::vector<unsigned char> first_bytes;
-          first_bytes.resize(2);
+          std::array<unsigned char, 2> first_bytes;
           stream.read((char *)&first_bytes[0], 2);
 
           unsigned char fin_rsv_opcode = first_bytes[0];
@@ -574,8 +574,7 @@ namespace SimpleWeb {
               if(!ec) {
                 std::istream stream(&connection->read_buffer);
 
-                std::vector<unsigned char> length_bytes;
-                length_bytes.resize(2);
+                std::array<unsigned char, 2> length_bytes;
                 stream.read((char *)&length_bytes[0], 2);
 
                 std::size_t length = 0;
@@ -598,8 +597,7 @@ namespace SimpleWeb {
               if(!ec) {
                 std::istream stream(&connection->read_buffer);
 
-                std::vector<unsigned char> length_bytes;
-                length_bytes.resize(8);
+                std::array<unsigned char, 8> length_bytes;
                 stream.read((char *)&length_bytes[0], 8);
 
                 std::size_t length = 0;
@@ -638,8 +636,7 @@ namespace SimpleWeb {
           std::istream istream(&connection->read_buffer);
 
           // Read mask
-          std::vector<unsigned char> mask;
-          mask.resize(4);
+          std::array<unsigned char, 4> mask;
           istream.read((char *)&mask[0], 4);
 
           std::shared_ptr<Message> message;
