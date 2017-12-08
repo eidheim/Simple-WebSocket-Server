@@ -62,6 +62,7 @@ namespace SimpleWeb {
 
     private:
       Message() noexcept : std::istream(&streambuf), length(0) {}
+      Message(unsigned char fin_rsv_opcode, std::size_t length) noexcept : std::istream(&streambuf), fin_rsv_opcode(fin_rsv_opcode), length(length) {}
       std::size_t length;
       asio::streambuf streambuf;
     };
@@ -555,9 +556,7 @@ namespace SimpleWeb {
           std::shared_ptr<Message> next_message;
           if(num_additional_bytes > 0) { // Extract bytes that are not extra bytes in buffer (only happen when several messages are sent in handshake response)
             next_message = connection->message;
-            connection->message = std::shared_ptr<Message>(new Message());
-            connection->message->fin_rsv_opcode = next_message->fin_rsv_opcode;
-            connection->message->length = next_message->length;
+            connection->message = std::shared_ptr<Message>(new Message(next_message->fin_rsv_opcode, next_message->length));
             std::ostream ostream(&connection->message->streambuf);
             for(size_t c = 0; c < next_message->length; ++c)
               ostream.put(next_message->get());
