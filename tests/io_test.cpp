@@ -59,6 +59,23 @@ int main() {
     connection->send(send_stream);
   };
 
+  auto &fragmented_message = server.endpoint["^/fragmented_message/?$"];
+  fragmented_message.on_message = [&server_callback_count](shared_ptr<WsServer::Connection> connection, shared_ptr<WsServer::Message> message) {
+    ++server_callback_count;
+    assert(message->string() == "fragmented message");
+    auto send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << "fragmented";
+    connection->send(send_stream, nullptr, 1);
+
+    send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << " ";
+    connection->send(send_stream, nullptr, 0);
+
+    send_stream = make_shared<WsServer::SendStream>();
+    *send_stream << "message";
+    connection->send(send_stream, nullptr, 128);
+  };
+
   thread server_thread([&server]() {
     server.start();
   });
@@ -230,6 +247,63 @@ int main() {
 
     assert(client_callback_count == 202);
     assert(server_callback_count == 202);
+  }
+
+  {
+    WsClient client("localhost:8080/fragmented_message");
+
+    server_callback_count = 0;
+    atomic<int> client_callback_count(0);
+    atomic<bool> closed(false);
+
+    client.on_message = [&](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message) {
+      assert(message->string() == "fragmented message");
+
+      ++client_callback_count;
+
+      connection->send_close(1000);
+    };
+
+    client.on_open = [&](shared_ptr<WsClient::Connection> connection) {
+      ++client_callback_count;
+
+      assert(!closed);
+
+      auto send_stream = make_shared<WsClient::SendStream>();
+      *send_stream << "fragmented";
+      connection->send(send_stream, nullptr, 1);
+
+      send_stream = make_shared<WsClient::SendStream>();
+      *send_stream << " ";
+      connection->send(send_stream, nullptr, 0);
+
+      send_stream = make_shared<WsClient::SendStream>();
+      *send_stream << "message";
+      connection->send(send_stream, nullptr, 128);
+    };
+
+    client.on_close = [&](shared_ptr<WsClient::Connection> /*connection*/, int /*status*/, const string & /*reason*/) {
+      assert(!closed);
+      closed = true;
+    };
+
+    client.on_error = [](shared_ptr<WsClient::Connection> /*connection*/, const SimpleWeb::error_code &ec) {
+      cerr << ec.message() << endl;
+      assert(false);
+    };
+
+    thread client_thread([&client]() {
+      client.start();
+    });
+
+    while(!closed)
+      this_thread::sleep_for(chrono::milliseconds(5));
+
+    client.stop();
+    client_thread.join();
+
+    assert(client_callback_count == 2);
+    assert(server_callback_count == 1);
   }
 
   server.stop();
