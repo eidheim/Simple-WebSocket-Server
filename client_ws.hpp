@@ -427,7 +427,7 @@ namespace SimpleWeb {
               // "After a successful async_read_until operation, the streambuf may contain additional data beyond the delimiter"
               // The chosen solution is to extract lines from the stream directly when parsing the header. What is left of the
               // streambuf (maybe some bytes of a message) is appended to in the next async_read-function
-              size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+              std::size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
               if(!ResponseMessage::parse(*connection->message, connection->http_version, connection->status_code, connection->header) ||
                  connection->status_code.empty() || connection->status_code.compare(0, 4, "101 ") != 0) {
@@ -453,7 +453,7 @@ namespace SimpleWeb {
       });
     }
 
-    void read_message(const std::shared_ptr<Connection> &connection, size_t num_additional_bytes) {
+    void read_message(const std::shared_ptr<Connection> &connection, std::size_t num_additional_bytes) {
       asio::async_read(*connection->socket, connection->message->streambuf, asio::transfer_exactly(num_additional_bytes > 2 ? 0 : 2 - num_additional_bytes), [this, connection](const error_code &ec, std::size_t bytes_transferred) {
         auto lock = connection->handler_runner->continue_lock();
         if(!lock)
@@ -463,7 +463,7 @@ namespace SimpleWeb {
             this->read_message(connection, 0);
             return;
           }
-          size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+          std::size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
           std::array<unsigned char, 2> first_bytes;
           connection->message->read(reinterpret_cast<char *>(&first_bytes[0]), 2);
@@ -487,7 +487,7 @@ namespace SimpleWeb {
               if(!lock)
                 return;
               if(!ec) {
-                size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+                std::size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
                 std::array<unsigned char, 2> length_bytes;
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 2);
@@ -511,7 +511,7 @@ namespace SimpleWeb {
               if(!lock)
                 return;
               if(!ec) {
-                size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+                std::size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
 
                 std::array<unsigned char, 8> length_bytes;
                 connection->message->read(reinterpret_cast<char *>(&length_bytes[0]), 8);
@@ -538,7 +538,7 @@ namespace SimpleWeb {
       });
     }
 
-    void read_message_content(const std::shared_ptr<Connection> &connection, size_t num_additional_bytes) {
+    void read_message_content(const std::shared_ptr<Connection> &connection, std::size_t num_additional_bytes) {
       if(connection->message->length + (connection->fragmented_message ? connection->fragmented_message->length : 0) > config.max_message_size) {
         connection_error(connection, make_error_code::make_error_code(errc::message_size));
         const int status = 1009;
@@ -552,13 +552,13 @@ namespace SimpleWeb {
         if(!lock)
           return;
         if(!ec) {
-          size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+          std::size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
           std::shared_ptr<Message> next_message;
           if(num_additional_bytes > 0) { // Extract bytes that are not extra bytes in buffer (only happen when several messages are sent in handshake response)
             next_message = connection->message;
             connection->message = std::shared_ptr<Message>(new Message(next_message->fin_rsv_opcode, next_message->length));
             std::ostream ostream(&connection->message->streambuf);
-            for(size_t c = 0; c < next_message->length; ++c)
+            for(std::size_t c = 0; c < next_message->length; ++c)
               ostream.put(next_message->get());
           }
           else

@@ -76,6 +76,7 @@ namespace SimpleWeb {
 
     private:
       Message() noexcept : std::istream(&streambuf), length(0) {}
+      Message(unsigned char fin_rsv_opcode, std::size_t length) noexcept : std::istream(&streambuf), fin_rsv_opcode(fin_rsv_opcode), length(length) {}
       std::size_t length;
       asio::streambuf streambuf;
     };
@@ -644,17 +645,15 @@ namespace SimpleWeb {
           // If fragmented message
           if((fin_rsv_opcode & 0x80) == 0 || (fin_rsv_opcode & 0x0f) == 0) {
             if(!connection->fragmented_message) {
-              connection->fragmented_message = std::shared_ptr<Message>(new Message());
-              connection->fragmented_message->fin_rsv_opcode = fin_rsv_opcode | 0x80;
+              connection->fragmented_message = std::shared_ptr<Message>(new Message(fin_rsv_opcode, length));
+              connection->fragmented_message->fin_rsv_opcode |= 0x80;
             }
-            connection->fragmented_message->length += length;
+            else
+              connection->fragmented_message->length += length;
             message = connection->fragmented_message;
           }
-          else {
-            message = std::shared_ptr<Message>(new Message());
-            message->length = length;
-            message->fin_rsv_opcode = fin_rsv_opcode;
-          }
+          else
+            message = std::shared_ptr<Message>(new Message(fin_rsv_opcode, length));
           std::ostream ostream(&message->streambuf);
           for(std::size_t c = 0; c < length; c++)
             ostream.put(istream.get() ^ mask[c % 4]);
