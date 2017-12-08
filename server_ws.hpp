@@ -642,66 +642,77 @@ namespace SimpleWeb {
 
           std::shared_ptr<Message> message;
 
-          // If fragmented message or final fragment of a fragmented message
-          if((fin_rsv_opcode & 0x80) == 0 || connection->fragmented_message) {
+          // If fragmented message
+          if((fin_rsv_opcode & 0x80) == 0 || (fin_rsv_opcode & 0x0f) == 0) {
             if(!connection->fragmented_message) {
               connection->fragmented_message = std::shared_ptr<Message>(new Message());
               connection->fragmented_message->fin_rsv_opcode = fin_rsv_opcode | 0x80;
             }
             connection->fragmented_message->length += length;
-            std::ostream ostream(&connection->fragmented_message->streambuf);
-            for(std::size_t c = 0; c < length; c++)
-              ostream.put(istream.get() ^ mask[c % 4]);
+            message = connection->fragmented_message;
           }
           else {
             message = std::shared_ptr<Message>(new Message());
             message->length = length;
             message->fin_rsv_opcode = fin_rsv_opcode;
-            std::ostream ostream(&message->streambuf);
-            for(std::size_t c = 0; c < length; c++)
-              ostream.put(istream.get() ^ mask[c % 4]);
           }
+          std::ostream ostream(&message->streambuf);
+          for(std::size_t c = 0; c < length; c++)
+            ostream.put(istream.get() ^ mask[c % 4]);
 
           // If connection close
           if((fin_rsv_opcode & 0x0f) == 8) {
-            auto &msg = connection->fragmented_message ? connection->fragmented_message : message;
+            connection->cancel_timeout();
+            connection->set_timeout();
+
             int status = 0;
             if(length >= 2) {
-              unsigned char byte1 = msg->get();
-              unsigned char byte2 = msg->get();
-              status = (byte1 << 8) + byte2;
+              unsigned char byte1 = message->get();
+              unsigned char byte2 = message->get();
+              status = (static_cast<int>(byte1) << 8) + byte2;
             }
 
-            auto reason = msg->string();
+            auto reason = message->string();
             connection->send_close(status, reason);
             this->connection_close(connection, endpoint, status, reason);
-            return;
           }
           // If ping
           else if((fin_rsv_opcode & 0x0f) == 9) {
+            connection->cancel_timeout();
+            connection->set_timeout();
+
             // Send pong
             auto empty_send_stream = std::make_shared<SendStream>();
-            connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
+            connection->send(empty_send_stream, nullptr, 10);
+
+            // Next message
+            this->read_message(connection, endpoint);
+          }
+          // If pong
+          else if((fin_rsv_opcode & 0x0f) == 10) {
+            connection->cancel_timeout();
+            connection->set_timeout();
+
+            // Next message
+            this->read_message(connection, endpoint);
           }
           // If fragmented message and not final fragment
           else if((fin_rsv_opcode & 0x80) == 0) {
             // Next message
             this->read_message(connection, endpoint);
-            return;
           }
           else {
             connection->cancel_timeout();
             connection->set_timeout();
 
-            if(endpoint.on_message) {
-              auto &msg = connection->fragmented_message ? connection->fragmented_message : message;
-              endpoint.on_message(connection, msg);
-            }
-          }
+            if(endpoint.on_message)
+              endpoint.on_message(connection, message);
+            // Only reset fragmented_message for non-control frames (control frames can be in between a fragmented message)
+            connection->fragmented_message = nullptr;
 
-          // Next message
-          connection->fragmented_message = nullptr;
-          this->read_message(connection, endpoint);
+            // Next message
+            this->read_message(connection, endpoint);
+          }
         }
         else
           this->connection_error(connection, endpoint, ec);

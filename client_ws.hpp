@@ -556,23 +556,41 @@ namespace SimpleWeb {
 
           // If connection close
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
+            connection->cancel_timeout();
+            connection->set_timeout();
+
             int status = 0;
             if(connection->message->length >= 2) {
               unsigned char byte1 = connection->message->get();
               unsigned char byte2 = connection->message->get();
-              status = (byte1 << 8) + byte2;
+              status = (static_cast<int>(byte1) << 8) + byte2;
             }
 
             auto reason = connection->message->string();
             connection->send_close(status, reason);
             this->connection_close(connection, status, reason);
-            return;
           }
           // If ping
           else if((connection->message->fin_rsv_opcode & 0x0f) == 9) {
+            connection->cancel_timeout();
+            connection->set_timeout();
+
             // Send pong
             auto empty_send_stream = std::make_shared<SendStream>();
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
+
+            // Next message
+            connection->message = std::shared_ptr<Message>(new Message());
+            this->read_message(connection, num_additional_bytes);
+          }
+          // If pong
+          else if((connection->message->fin_rsv_opcode & 0x0f) == 10) {
+            connection->cancel_timeout();
+            connection->set_timeout();
+
+            // Next message
+            connection->message = std::shared_ptr<Message>(new Message());
+            this->read_message(connection, num_additional_bytes);
           }
           // If fragmented message and not final fragment
           else if((connection->message->fin_rsv_opcode & 0x80) == 0) {
@@ -587,7 +605,6 @@ namespace SimpleWeb {
             // Next message
             connection->message = std::shared_ptr<Message>(new Message());
             this->read_message(connection, num_additional_bytes);
-            return;
           }
           else {
             connection->cancel_timeout();
@@ -604,12 +621,13 @@ namespace SimpleWeb {
               else
                 this->on_message(connection, connection->message);
             }
-          }
 
-          // Next message
-          connection->message = std::shared_ptr<Message>(new Message());
-          connection->fragmented_message = nullptr;
-          this->read_message(connection, num_additional_bytes);
+            // Next message
+            connection->message = std::shared_ptr<Message>(new Message());
+            // Only reset fragmented_message for non-control frames (control frames can be in between a fragmented message)
+            connection->fragmented_message = nullptr;
+            this->read_message(connection, num_additional_bytes);
+          }
         }
         else
           this->connection_error(connection, ec);
