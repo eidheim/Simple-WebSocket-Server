@@ -555,6 +555,17 @@ namespace SimpleWeb {
           return;
         if(!ec) {
           size_t num_additional_bytes = connection->message->streambuf.size() - bytes_transferred;
+          std::shared_ptr<Message> next_message;
+          if(num_additional_bytes > 0) { // Extract bytes that are not extra bytes in buffer (only happen when several messages are sent in handshake response)
+            auto next_message = connection->message;
+            connection->message = std::shared_ptr<Message>(new Message());
+            std::istream istream(&next_message->streambuf);
+            std::ostream ostream(&connection->message->streambuf);
+            for(size_t c = 0; c < next_message->length; ++c)
+              ostream.put(istream.get());
+          }
+          else
+            next_message = std::shared_ptr<Message>(new Message());
 
           // If connection close
           if((connection->message->fin_rsv_opcode & 0x0f) == 8) {
@@ -585,7 +596,7 @@ namespace SimpleWeb {
               this->on_ping(connection);
 
             // Next message
-            connection->message = std::shared_ptr<Message>(new Message());
+            connection->message = next_message;
             this->read_message(connection, num_additional_bytes);
           }
           // If pong
@@ -597,7 +608,7 @@ namespace SimpleWeb {
               this->on_pong(connection);
 
             // Next message
-            connection->message = std::shared_ptr<Message>(new Message());
+            connection->message = next_message;
             this->read_message(connection, num_additional_bytes);
           }
           // If fragmented message and not final fragment
@@ -613,7 +624,7 @@ namespace SimpleWeb {
             }
 
             // Next message
-            connection->message = std::shared_ptr<Message>(new Message());
+            connection->message = next_message;
             this->read_message(connection, num_additional_bytes);
           }
           else {
@@ -633,7 +644,7 @@ namespace SimpleWeb {
             }
 
             // Next message
-            connection->message = std::shared_ptr<Message>(new Message());
+            connection->message = next_message;
             // Only reset fragmented_message for non-control frames (control frames can be in between a fragmented message)
             connection->fragmented_message = nullptr;
             this->read_message(connection, num_additional_bytes);

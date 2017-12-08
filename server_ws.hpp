@@ -685,7 +685,7 @@ namespace SimpleWeb {
 
             // Send pong
             auto empty_send_stream = std::make_shared<SendStream>();
-            connection->send(empty_send_stream, nullptr, 10);
+            connection->send(empty_send_stream, nullptr, fin_rsv_opcode + 1);
 
             if(endpoint.on_ping)
               endpoint.on_ping(connection);
