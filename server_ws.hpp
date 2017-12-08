@@ -715,10 +715,10 @@ namespace SimpleWeb {
 
             if(endpoint.on_message)
               endpoint.on_message(connection, message);
-            // Only reset fragmented_message for non-control frames (control frames can be in between a fragmented message)
-            connection->fragmented_message = nullptr;
 
             // Next message
+            // Only reset fragmented_message for non-control frames (control frames can be in between a fragmented message)
+            connection->fragmented_message = nullptr;
             this->read_message(connection, endpoint);
           }
         }

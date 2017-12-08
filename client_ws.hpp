@@ -603,12 +603,14 @@ namespace SimpleWeb {
           // If fragmented message and not final fragment
           else if((connection->message->fin_rsv_opcode & 0x80) == 0) {
             if(!connection->fragmented_message) {
-              connection->fragmented_message = std::shared_ptr<Message>(new Message());
-              connection->fragmented_message->fin_rsv_opcode = connection->message->fin_rsv_opcode | 0x80;
+              connection->fragmented_message = connection->message;
+              connection->fragmented_message->fin_rsv_opcode |= 0x80;
             }
-            connection->fragmented_message->length += connection->message->length;
-            std::ostream ostream(&connection->fragmented_message->streambuf);
-            ostream << connection->message->rdbuf();
+            else {
+              connection->fragmented_message->length += connection->message->length;
+              std::ostream ostream(&connection->fragmented_message->streambuf);
+              ostream << connection->message->rdbuf();
+            }
 
             // Next message
             connection->message = std::shared_ptr<Message>(new Message());
