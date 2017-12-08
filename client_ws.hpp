@@ -556,10 +556,9 @@ namespace SimpleWeb {
           if(num_additional_bytes > 0) { // Extract bytes that are not extra bytes in buffer (only happen when several messages are sent in handshake response)
             auto next_message = connection->message;
             connection->message = std::shared_ptr<Message>(new Message());
-            std::istream istream(&next_message->streambuf);
             std::ostream ostream(&connection->message->streambuf);
             for(size_t c = 0; c < next_message->length; ++c)
-              ostream.put(istream.get());
+              ostream.put(next_message->get());
           }
           else
             next_message = std::shared_ptr<Message>(new Message());
