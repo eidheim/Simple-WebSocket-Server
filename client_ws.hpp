@@ -304,6 +304,8 @@ namespace SimpleWeb {
     std::function<void(std::shared_ptr<Connection>, std::shared_ptr<Message>)> on_message;
     std::function<void(std::shared_ptr<Connection>, int, const std::string &)> on_close;
     std::function<void(std::shared_ptr<Connection>, const error_code &)> on_error;
+    std::function<void(std::shared_ptr<Connection>)> on_ping;
+    std::function<void(std::shared_ptr<Connection>)> on_pong;
 
     void start() {
       if(!io_service) {
@@ -579,6 +581,9 @@ namespace SimpleWeb {
             auto empty_send_stream = std::make_shared<SendStream>();
             connection->send(empty_send_stream, nullptr, connection->message->fin_rsv_opcode + 1);
 
+            if(this->on_ping)
+              this->on_ping(connection);
+
             // Next message
             connection->message = std::shared_ptr<Message>(new Message());
             this->read_message(connection, num_additional_bytes);
@@ -587,6 +592,9 @@ namespace SimpleWeb {
           else if((connection->message->fin_rsv_opcode & 0x0f) == 10) {
             connection->cancel_timeout();
             connection->set_timeout();
+
+            if(this->on_pong)
+              this->on_pong(connection);
 
             // Next message
             connection->message = std::shared_ptr<Message>(new Message());
