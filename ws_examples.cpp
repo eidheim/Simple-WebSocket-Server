@@ -109,9 +109,7 @@ int main() {
   //   Client: Closed connection with status code 1000
   WsClient client("localhost:8080/echo");
   client.on_message = [](shared_ptr<WsClient::Connection> connection, shared_ptr<WsClient::Message> message) {
-    auto message_str = message->string();
-
-    cout << "Client: Message received: \"" << message_str << "\"" << endl;
+    cout << "Client: Message received: \"" << message->string() << "\"" << endl;
 
     cout << "Client: Sending close connection" << endl;
     connection->send_close(1000);
