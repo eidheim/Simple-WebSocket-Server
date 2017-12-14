@@ -491,7 +491,7 @@ namespace SimpleWeb {
 
     std::shared_ptr<ScopeRunner> handler_runner;
 
-    SocketServerBase(unsigned short port) noexcept : config(port), handler_runner(new ScopeRunner()) {}
+    explicit SocketServerBase(unsigned short port) noexcept : config(port), handler_runner(new ScopeRunner()) {}
 
     virtual void accept() = 0;
 
@@ -771,7 +771,7 @@ namespace SimpleWeb {
   template <>
   class SocketServer<WS> : public SocketServerBase<WS> {
   public:
-    SocketServer() noexcept : SocketServerBase<WS>(80) {}
+    explicit SocketServer(unsigned short port=80) noexcept : SocketServerBase<WS>(port) {}
 
   protected:
     void accept() override {
