@@ -428,15 +428,19 @@ namespace SimpleWeb {
       }
     }
 
-    void stop() noexcept {
+    void stop(const int status=1000, const std::string reason="") noexcept {
       if(acceptor) {
         error_code ec;
         acceptor->close(ec);
 
         for(auto &pair : endpoint) {
           std::unique_lock<std::mutex> lock(pair.second.connections_mutex);
-          for(auto &connection : pair.second.connections)
+          for(auto &connection : pair.second.connections) {
+            if(status > 0) {
+              connection->send_close(status, reason);
+            }
             connection->close();
+          }
           pair.second.connections.clear();
         }
 
