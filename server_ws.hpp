@@ -445,6 +445,14 @@ namespace SimpleWeb {
       }
     }
 
+    /// Stop accepting new connections
+    void stop_accept() noexcept {
+      if(acceptor) {
+        error_code ec;
+        acceptor->close(ec);
+      }
+    }
+
     virtual ~SocketServerBase() noexcept {}
 
     std::unordered_set<std::shared_ptr<Connection>> get_connections() noexcept {
