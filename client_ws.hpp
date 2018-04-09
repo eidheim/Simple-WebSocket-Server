@@ -587,8 +587,8 @@ namespace SimpleWeb {
 
             // Send pong
             auto pong_stream = std::make_shared<SendStream>();
-            *pong_stream << message->string();
-            connection->send(pong_stream, nullptr, fin_rsv_opcode + 1);
+            *pong_stream << connection->message->string();
+            connection->send(pong_stream, nullptr, connection->message->fin_rsv_opcode + 1);
 
             if(this->on_ping)
               this->on_ping(connection);
