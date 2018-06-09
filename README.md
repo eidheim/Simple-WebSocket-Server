@@ -1,9 +1,11 @@
-Simple-WebSocket-Server [![Build Status](https://travis-ci.org/eidheim/Simple-WebSocket-Server.svg?branch=master)](https://travis-ci.org/eidheim/Simple-WebSocket-Server)
+**_This project has moved to https://gitlab.com/eidheim/Simple-WebSocket-Server._**
+
+Simple-WebSocket-Server
 =================
 
 A very simple, fast, multithreaded, platform independent WebSocket (WS) and WebSocket Secure (WSS) server and client library implemented using C++11, Asio (both Boost.Asio and standalone Asio can be used) and OpenSSL. Created to be an easy way to make WebSocket endpoints in C++.
 
-See https://github.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. Also, feel free to check out the new C++ IDE supporting C++11/14/17: https://github.com/cppit/jucipp. 
+See https://gitlab.com/eidheim/Simple-Web-Server for an easy way to make REST resources available from C++ applications. Also, feel free to check out the new C++ IDE supporting C++11/14/17: https://gitlab.com/cppit/jucipp. 
 
 ### Features
 
